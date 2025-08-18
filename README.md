@@ -1,28 +1,30 @@
-# Agentic Insurance Data Migration Platform
+# Migration-Accelerators
 
-A modern, LLM-agnostic platform for migrating disability and absence book of business from legacy mainframe systems to modern platforms using Google's A2A framework, LangGraph, and MCP.
+A modern, LLM-agnostic platform for accelerating data migration projects using Agentic AI, Google's A2A framework, LangGraph, and MCP. This platform leverages intelligent agents to automate complex migration workflows across various domains and data formats.
 
 ## 🚀 Features
 
+- **Agentic AI Architecture**: Multi-agent system that autonomously handles complex migration tasks
 - **A2A Framework Integration**: Leverages Google's Agent-to-Agent framework for intelligent agent coordination
 - **LLM Agnostic**: Support for OpenAI, AWS Bedrock, Anthropic, and Google Vertex AI
 - **LangGraph Workflows**: Complex multi-agent workflows with state management
 - **MCP Integration**: Model Context Protocol for standardized API interactions
-- **Field Mapping**: Dynamic field mapping from configuration files
-- **Comprehensive Validation**: LLM-powered data validation and business rule checking
+- **Dynamic Field Mapping**: AI-powered field mapping and transformation from configuration files
+- **Intelligent Validation**: LLM-powered data validation and business rule checking
 - **Rich Logging**: LangSmith integration for LLM call tracking and debugging
+- **Domain Agnostic**: Works across various industries and data formats
 
 ## 🏗️ Architecture
 
-The platform uses a multi-agent architecture with the following components:
+The platform uses an Agentic AI architecture with intelligent agents that autonomously handle migration tasks:
 
 ### Core Agents
-1. **File Reader Agent** - Reads and parses mainframe files
-2. **Validation Agent** - Validates data integrity and business rules
-3. **Mapping Agent** - Handles field transformations and mappings
-4. **Transformation Agent** - Converts data to target format
-5. **API Integration Agent** - Manages MCP-based API calls
-6. **Orchestration Agent** - Coordinates the entire workflow
+1. **File Reader Agent** - Intelligently reads and parses various file formats
+2. **Validation Agent** - AI-powered data integrity and business rule validation
+3. **Mapping Agent** - Autonomous field mapping and transformation discovery
+4. **Transformation Agent** - Intelligent data format conversion and optimization
+5. **API Integration Agent** - Manages MCP-based API calls with error recovery
+6. **Orchestration Agent** - Coordinates the entire workflow with adaptive decision making
 
 ### Key Technologies
 - **A2A Framework**: Google's Agent-to-Agent coordination
@@ -36,7 +38,7 @@ The platform uses a multi-agent architecture with the following components:
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd learning-agenticAI
+cd Migration-Accelerators
 
 # Install dependencies
 pip install -r requirements.txt
@@ -74,20 +76,20 @@ MCP_API_KEY=your_mcp_key
 Create mapping files in `config/mappings/`:
 
 ```yaml
-# config/mappings/disability_mapping.yaml
+# config/mappings/sample_mapping.yaml
 source_format: csv
 target_format: json
-record_type: disability
+record_type: customer_data
 rules:
-  - source_field: policy_number
-    target_field: policyId
+  - source_field: customer_id
+    target_field: customerId
     transformation_type: direct
     validation:
       required: true
       pattern: "^[A-Z0-9]{6,12}$"
   
-  - source_field: effective_date
-    target_field: effectiveDate
+  - source_field: registration_date
+    target_field: registrationDate
     transformation_type: date_format
     source_format: "%Y-%m-%d"
     target_format: "ISO8601"
@@ -102,13 +104,13 @@ rules:
 
 ```bash
 # Run migration with default configuration
-python main.py migrate data/input/disability_data.csv
+python main.py migrate data/input/sample_data.csv
 
 # Run with custom mapping
-python main.py migrate data/input/disability_data.csv --mapping config/mappings/custom_mapping.yaml
+python main.py migrate data/input/sample_data.csv --mapping config/mappings/custom_mapping.yaml
 
 # Run in dry-run mode
-python main.py migrate data/input/disability_data.csv --dry-run
+python main.py migrate data/input/sample_data.csv --dry-run
 ```
 
 ### Advanced Usage
@@ -125,9 +127,9 @@ platform = MigrationPlatform(
 
 # Run migration
 result = await platform.migrate(
-    input_file="data/input/disability_data.csv",
-    mapping_file="config/mappings/disability_mapping.yaml",
-    target_system="modern_insurance_platform"
+    input_file="data/input/sample_data.csv",
+    mapping_file="config/mappings/sample_mapping.yaml",
+    target_system="modern_target_system"
 )
 
 print(f"Migration completed: {result.success_rate}% success rate")
@@ -137,7 +139,7 @@ print(f"Migration completed: {result.success_rate}% success rate")
 
 ```bash
 # Validate configuration
-python main.py validate config/mappings/disability_mapping.yaml
+python main.py validate config/mappings/sample_mapping.yaml
 
 # Check platform status
 python main.py status
@@ -146,7 +148,7 @@ python main.py status
 python main.py test
 
 # View logs in LangSmith
-python main.py logs --project insurance-migration
+python main.py logs --project migration-accelerators
 ```
 
 ## 🔧 Development
@@ -202,16 +204,16 @@ class CustomLLMProvider(LLMProvider):
 ```python
 from mcp.tools import MCPTool
 
-class InsuranceAPITool(MCPTool):
+class DataAPITool(MCPTool):
     def __init__(self):
-        super().__init__("insurance_api")
+        super().__init__("data_api")
     
-    async def create_policy(self, policy_data: dict) -> dict:
-        # Implement policy creation logic
+    async def create_record(self, record_data: dict) -> dict:
+        # Implement record creation logic
         pass
     
-    async def update_policy(self, policy_id: str, updates: dict) -> dict:
-        # Implement policy update logic
+    async def update_record(self, record_id: str, updates: dict) -> dict:
+        # Implement record update logic
         pass
 ```
 
@@ -281,9 +283,11 @@ For support and questions:
 
 ## 🔄 Roadmap
 
-- [ ] Support for additional file formats (XML, EDI)
+- [ ] Support for additional file formats (XML, EDI, Parquet, Avro)
 - [ ] Real-time migration monitoring dashboard
-- [ ] Advanced business rule engine
-- [ ] Multi-tenant support
+- [ ] Advanced Agentic AI decision making capabilities
+- [ ] Multi-tenant support with agent isolation
 - [ ] Performance optimization for large datasets
 - [ ] Integration with additional MCP servers
+- [ ] Autonomous schema discovery and mapping
+- [ ] Cross-domain migration templates

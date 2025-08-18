@@ -1,5 +1,5 @@
 """
-Basic tests for the migration platform.
+Basic tests for the Migration-Accelerators platform.
 """
 
 import pytest
@@ -42,21 +42,21 @@ class TestMappingConfiguration:
     
     def test_default_mapping_creation(self):
         """Test creating default mapping configuration."""
-        mapping_config = create_default_mapping_config("disability")
+        mapping_config = create_default_mapping_config("customer_data")
         assert mapping_config is not None
-        assert mapping_config.record_type == "disability"
+        assert mapping_config.record_type == "customer_data"
         assert len(mapping_config.rules) > 0
     
     def test_mapping_validation(self):
         """Test mapping configuration validation."""
-        mapping_config = create_default_mapping_config("disability")
+        mapping_config = create_default_mapping_config("customer_data")
         errors = validate_mapping_config(mapping_config)
         assert len(errors) == 0
     
     def test_mapping_validation_with_errors(self):
         """Test mapping validation with errors."""
         # Create invalid mapping
-        mapping_config = create_default_mapping_config("disability")
+        mapping_config = create_default_mapping_config("customer_data")
         mapping_config.rules[0].source_field = ""  # Invalid empty field
         
         errors = validate_mapping_config(mapping_config)
@@ -74,7 +74,7 @@ class TestFileReader:
         file_reader = FileReaderAgent()
         
         # Test CSV detection
-        csv_path = "data/input/sample_disability_data.csv"
+        csv_path = "data/input/sample_data.csv"
         if os.path.exists(csv_path):
             format_detected = file_reader._detect_file_format(csv_path)
             assert format_detected == "csv"
@@ -85,7 +85,7 @@ class TestFileReader:
         from agents.file_reader import FileReaderAgent
         
         file_reader = FileReaderAgent()
-        csv_path = "data/input/sample_disability_data.csv"
+        csv_path = "data/input/sample_data.csv"
         
         if os.path.exists(csv_path):
             records = await file_reader._read_csv(csv_path)

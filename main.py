@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main CLI interface for the Agentic Insurance Data Migration Platform.
+Main CLI interface for the Migration-Accelerators platform.
 """
 
 import asyncio
@@ -25,8 +25,8 @@ from config.mappings import load_mapping_config
 
 # Initialize Typer app
 app = typer.Typer(
-    name="migration-platform",
-    help="Agentic Insurance Data Migration Platform",
+    name="migration-accelerators",
+    help="Migration-Accelerators - Agentic AI Data Migration Platform",
     add_completion=False
 )
 
@@ -38,15 +38,15 @@ console = Console()
 def migrate(
     file_path: str = typer.Argument(..., help="Path to the input file"),
     mapping_file: Optional[str] = typer.Option(None, "--mapping", "-m", help="Path to mapping configuration file"),
-    record_type: str = typer.Option("disability", "--type", "-t", help="Record type (disability, absence, etc.)"),
+    record_type: str = typer.Option("customer_data", "--type", "-t", help="Record type (customer_data, product_data, etc.)"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Run in dry-run mode (no API calls)"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output")
 ):
-    """Migrate insurance data from legacy mainframe to modern system."""
+    """Migrate data from legacy systems to modern platforms using Agentic AI."""
     
     console.print(Panel.fit(
-        "[bold blue]Agentic Insurance Data Migration Platform[/bold blue]\n"
-        "Powered by A2A Framework, LangGraph, and MCP",
+        "[bold blue]Migration-Accelerators[/bold blue]\n"
+        "Agentic AI Data Migration Platform - Powered by A2A Framework, LangGraph, and MCP",
         border_style="blue"
     ))
     

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Example usage of the Agentic Insurance Data Migration Platform
+Example usage of the Migration-Accelerators platform
 
-This script demonstrates how to use the platform to migrate insurance data
-from legacy mainframe systems to modern platforms.
+This script demonstrates how to use the platform to migrate data
+from legacy systems to modern platforms using Agentic AI.
 """
 
 import asyncio
@@ -24,7 +24,7 @@ from config.mappings import load_mapping_config, create_default_mapping_config
 async def example_migration():
     """Example of a complete migration workflow."""
     
-    print("🚀 Starting Agentic Insurance Data Migration Platform Example")
+    print("🚀 Starting Migration-Accelerators Platform Example")
     print("=" * 60)
     
     # Step 1: Initialize components
@@ -54,19 +54,19 @@ async def example_migration():
     # Step 2: Load or create mapping configuration
     print("\n2. Loading mapping configuration...")
     
-    mapping_file = "config/mappings/disability_mapping.yaml"
+    mapping_file = "config/mappings/sample_mapping.yaml"
     try:
         mapping_config = load_mapping_config(mapping_file)
         print(f"   ✓ Mapping configuration loaded from {mapping_file}")
     except FileNotFoundError:
         print(f"   ⚠ Mapping file not found, creating default...")
-        mapping_config = create_default_mapping_config("disability")
+        mapping_config = create_default_mapping_config("customer_data")
         print("   ✓ Default mapping configuration created")
     
     # Step 3: Check input file
     print("\n3. Checking input file...")
     
-    input_file = "data/input/sample_disability_data.csv"
+    input_file = "data/input/sample_data.csv"
     if not os.path.exists(input_file):
         print(f"   ❌ Input file not found: {input_file}")
         print("   Please ensure the sample data file exists")
@@ -87,7 +87,7 @@ async def example_migration():
         result = await workflow.run(
             file_path=input_file,
             mapping_config=mapping_config,
-            record_type="disability"
+            record_type="customer_data"
         )
         
         # Step 6: Display results

@@ -1,5 +1,5 @@
 """
-Configuration settings for the migration platform.
+Configuration settings for the Migration-Accelerators platform.
 """
 
 from typing import Optional, Dict, Any, List
@@ -26,12 +26,12 @@ class FileFormat(str, Enum):
 
 
 class RecordType(str, Enum):
-    """Insurance record types."""
-    DISABILITY = "disability"
-    ABSENCE = "absence"
-    GROUP_POLICY = "group_policy"
-    EMPLOYEE = "employee"
-    CLAIM = "claim"
+    """Data record types."""
+    CUSTOMER_DATA = "customer_data"
+    PRODUCT_DATA = "product_data"
+    TRANSACTION_DATA = "transaction_data"
+    USER_DATA = "user_data"
+    INVENTORY_DATA = "inventory_data"
 
 
 class TransformationType(str, Enum):
@@ -72,7 +72,7 @@ class MCPConfig(BaseModel):
 class LangSmithConfig(BaseModel):
     """LangSmith configuration."""
     api_key: Optional[str] = Field(None, description="LangSmith API key")
-    project: str = Field(default="insurance-migration", description="Project name")
+    project: str = Field(default="migration-accelerators", description="Project name")
     tracing_v2: bool = Field(default=True, description="Enable tracing v2")
     endpoint: Optional[str] = Field(None, description="Custom endpoint")
 
