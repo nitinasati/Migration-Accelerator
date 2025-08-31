@@ -206,6 +206,65 @@ def test():
 
 
 @app.command()
+def graph(
+    output_path: str = typer.Option("migration_workflow_graph.png", "--output", "-o", help="Output path for graph image"),
+    show_structure: bool = typer.Option(True, "--show-structure", help="Show workflow structure in console")
+):
+    """Generate and display the migration workflow graph."""
+    
+    console.print(Panel.fit(
+        "[bold blue]Migration Workflow Graph Generator[/bold blue]",
+        border_style="blue"
+    ))
+    
+    try:
+        # Initialize workflow
+        llm_config = get_llm_config()
+        mcp_config = get_mcp_config()
+        
+        workflow = MigrationWorkflow(llm_config, mcp_config)
+        
+        # Show workflow structure if requested
+        if show_structure:
+            workflow.print_graph_structure()
+        
+        # Generate graph image
+        console.print("\n[bold blue]Generating graph image...[/bold blue]")
+        
+        # Try to add Graphviz to PATH if not found
+        try:
+            import subprocess
+            subprocess.run(["dot", "-V"], capture_output=True, check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            console.print("[yellow]⚠[/yellow] Graphviz not in PATH, attempting to add it...")
+            import os
+            graphviz_path = r"C:\Program Files\Graphviz\bin"
+            if os.path.exists(graphviz_path):
+                os.environ["PATH"] += f";{graphviz_path}"
+                console.print(f"[green]✓[/green] Added Graphviz to PATH: {graphviz_path}")
+            else:
+                console.print("[red]✗[/red] Graphviz not found. Please install it with: winget install graphviz")
+                console.print("[yellow]Note:[/yellow] You can run the setup script: .\\setup_graphviz.ps1")
+                raise typer.Exit(1)
+        
+        graph_path = workflow.generate_graph_image(output_path)
+        
+        if graph_path:
+            console.print(f"[green]✓[/green] Workflow graph saved to: {graph_path}")
+            console.print("[blue]📊[/blue] Graph shows the complete migration workflow with all nodes and connections")
+        else:
+            console.print("[red]✗[/red] Failed to generate workflow graph")
+            raise typer.Exit(1)
+        
+        # Close workflow
+        asyncio.run(workflow.close())
+        
+    except Exception as e:
+        console.print(f"[red]Error generating graph: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
 def logs(
     project: str = typer.Option("migration-accelerators", "--project", "-p", help="LangSmith project name"),
     limit: int = typer.Option(10, "--limit", "-l", help="Number of logs to show")
@@ -241,6 +300,32 @@ async def _run_migration(
         mcp_config = get_mcp_config()
         
         workflow = MigrationWorkflow(llm_config, mcp_config)
+        
+        # Generate and display workflow graph
+        console.print("\n[bold blue]Generating Workflow Graph...[/bold blue]")
+        workflow.print_graph_structure()
+        
+        # Try to add Graphviz to PATH if not found
+        try:
+            import subprocess
+            subprocess.run(["dot", "-V"], capture_output=True, check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            console.print("[yellow]⚠[/yellow] Graphviz not in PATH, attempting to add it...")
+            import os
+            graphviz_path = r"C:\Program Files\Graphviz\bin"
+            if os.path.exists(graphviz_path):
+                os.environ["PATH"] += f";{graphviz_path}"
+                console.print(f"[green]✓[/green] Added Graphviz to PATH: {graphviz_path}")
+            else:
+                console.print("[yellow]⚠[/yellow] Graphviz not found. Skipping graph generation.")
+                console.print("[yellow]Note:[/yellow] Install with: winget install graphviz")
+        
+        # Generate graph image
+        graph_path = workflow.generate_graph_image("data/output/migration_workflow_graph.png")
+        if graph_path:
+            console.print(f"[green]✓[/green] Workflow graph saved to: {graph_path}")
+        else:
+            console.print("[yellow]⚠[/yellow] Could not generate workflow graph image")
         
         # Prepare target system configuration
         target_system = {
@@ -309,6 +394,17 @@ def _display_migration_results(result: dict, verbose: bool):
     table.add_row("Records Processed", str(summary.get("total_records_processed", 0)))
     table.add_row("Progress", f"{summary.get('progress', 0):.1f}%")
     table.add_row("Completed Steps", str(len(summary.get("completed_steps", []))))
+    
+    # Add timing information if available
+    if summary.get("total_duration_seconds"):
+        table.add_row("Total Duration", summary.get("total_duration_formatted", "N/A"))
+        table.add_row("Duration (seconds)", f"{summary.get('total_duration_seconds', 0):.2f}s")
+    
+    if summary.get("start_time"):
+        table.add_row("Start Time", summary.get("start_time", "N/A"))
+    
+    if summary.get("end_time"):
+        table.add_row("End Time", summary.get("end_time", "N/A"))
     
     console.print(table)
     

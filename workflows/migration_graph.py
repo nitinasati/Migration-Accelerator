@@ -4,9 +4,13 @@ LangGraph migration workflow for the Migration-Accelerators platform.
 
 from typing import Any, Dict, List, Optional, TypedDict, Annotated
 import operator
+import time
+from datetime import datetime, timedelta
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 import structlog
+import graphviz
+from pathlib import Path
 
 from agents.file_reader import FileReaderAgent
 from agents.validation import ValidationAgent
@@ -69,6 +73,11 @@ class MigrationState(TypedDict):
     errors: List[str]
     warnings: List[str]
     progress: float
+    
+    # Timing information
+    start_time: Optional[float]
+    end_time: Optional[float]
+    step_timings: Optional[Dict[str, float]]
     
     # Agent configurations
     llm_config: Optional[LLMConfig]
@@ -224,7 +233,161 @@ class MigrationWorkflow:
         workflow.add_edge("handle_error", END)
         
         # Compile the workflow for execution
-        return workflow.compile()
+        compiled_workflow = workflow.compile()
+        
+        # Store the uncompiled workflow for visualization
+        self._uncompiled_workflow = workflow
+        
+        return compiled_workflow
+    
+    def _get_workflow_structure(self) -> dict:
+        """
+        Get the workflow structure definition (nodes, edges, etc.).
+        This centralizes the workflow definition to avoid duplication.
+        
+        Returns:
+            Dictionary containing workflow structure information
+        """
+        return {
+            "nodes": {
+                "initialize": "Initialize\nWorkflow",
+                "read_file": "Read File\n(CSV/Excel/JSON)",
+                "validate_data": "Validate Data\n(Business Rules)",
+                "map_data": "Map Data\n(Field Transformations)",
+                "transform_data": "Transform Data\n(Format Conversion)",
+                "integrate_api": "API Integration\n(File Output)",
+                "finalize": "Finalize\nWorkflow",
+                "handle_error": "Handle Error\n(Error Processing)"
+            },
+            "edges": [
+                ("initialize", "read_file"),
+                ("read_file", "validate_data"),
+                ("validate_data", "map_data"),
+                ("map_data", "transform_data"),
+                ("transform_data", "integrate_api"),
+                ("integrate_api", "finalize"),
+                ("handle_error", "END")
+            ],
+            "conditional_edges": [
+                ("read_file", "handle_error"),
+                ("validate_data", "handle_error"),
+                ("map_data", "handle_error"),
+                ("transform_data", "handle_error"),
+                ("integrate_api", "handle_error")
+            ],
+            "entry_point": "initialize",
+            "error_node": "handle_error",
+            "end_node": "END"
+        }
+    
+    def generate_graph_image(self, output_path: str = "migration_workflow_graph.png") -> str:
+        """
+        Generate and save a visual representation of the migration workflow graph.
+        
+        Args:
+            output_path: Path where to save the graph image
+            
+        Returns:
+            Path to the generated image file
+        """
+        try:
+            # Get workflow structure from shared definition
+            structure = self._get_workflow_structure()
+            
+            # Create a new graph
+            dot = graphviz.Digraph(comment='Migration Workflow')
+            dot.attr(rankdir='TB', size='12,8')
+            dot.attr('node', shape='box', style='rounded,filled', fillcolor='lightblue')
+            dot.attr('edge', color='gray')
+            
+            # Add nodes to the graph
+            for node_id, label in structure["nodes"].items():
+                if node_id == structure["error_node"]:
+                    dot.node(node_id, label, fillcolor='lightcoral')
+                elif node_id == "finalize":
+                    dot.node(node_id, label, fillcolor='lightgreen')
+                else:
+                    dot.node(node_id, label)
+            
+            # Add regular edges
+            for start, end in structure["edges"]:
+                if end == structure["end_node"]:
+                    dot.node(structure["end_node"], "End", shape='doublecircle', fillcolor='lightgray')
+                dot.edge(start, end, color='blue')
+            
+            # Add conditional edges (error paths)
+            for start, end in structure["conditional_edges"]:
+                dot.edge(start, end, color='red', style='dashed', label='on error')
+            
+            # Add title
+            dot.attr(label='Migration-Accelerators Workflow\nAgentic AI Data Migration Platform', 
+                    fontsize='16', fontname='bold')
+            
+            # Ensure output directory exists
+            output_path = Path(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Render the graph
+            dot.render(output_path.with_suffix(''), format='png', cleanup=True)
+            
+            self.logger.info("Workflow graph generated", output_path=str(output_path))
+            return str(output_path)
+            
+        except ImportError:
+            self.logger.warning("graphviz not available for graph visualization")
+            return ""
+        except Exception as e:
+            self.logger.error("Failed to generate workflow graph", error=str(e))
+            return ""
+    
+    def print_graph_structure(self) -> None:
+        """
+        Print the workflow graph structure to console.
+        """
+        try:
+            # Get workflow structure from shared definition
+            structure = self._get_workflow_structure()
+            
+            print("\n" + "="*60)
+            print("🔄 MIGRATION WORKFLOW GRAPH STRUCTURE")
+            print("="*60)
+            
+            # Build display structure from shared definition
+            nodes_display = []
+            for node_id, label in structure["nodes"].items():
+                nodes_display.append(f"{node_id} → {label.replace(chr(10), ' ')}")
+            
+            flow_display = []
+            for start, end in structure["edges"]:
+                if end != structure["end_node"]:
+                    flow_display.append(f"{start} → {end}")
+                else:
+                    flow_display.append(f"{start} → {end}")
+            
+            # Add conditional flows
+            for start, end in structure["conditional_edges"]:
+                flow_display.append(f"{start} → {end} (on error)")
+            
+            print(f"📋 Entry Point: {structure['entry_point']}")
+            print(f"\n🔧 Workflow Nodes ({len(structure['nodes'])}):")
+            for i, node in enumerate(nodes_display, 1):
+                print(f"   {i}. {node}")
+            
+            print(f"\n🔄 Workflow Flow:")
+            for i, flow in enumerate(flow_display, 1):
+                print(f"   {i}. {flow}")
+            
+            print(f"\n📊 Workflow Statistics:")
+            print(f"   • Total Nodes: {len(structure['nodes'])}")
+            print(f"   • Processing Steps: 6 (read → validate → map → transform → integrate → finalize)")
+            print(f"   • Error Handling: Centralized error handling with {structure['error_node']} node")
+            print(f"   • Success Path: Linear progression through all processing steps")
+            print(f"   • Error Path: Any step can redirect to error handling")
+            
+            print("="*60)
+            
+        except Exception as e:
+            self.logger.error("Failed to print workflow structure", error=str(e))
     
     async def _initialize_workflow(self, state: MigrationState) -> MigrationState:
         """
@@ -729,6 +892,8 @@ class MigrationWorkflow:
                 - warnings: List of warning messages
         """
         try:
+            # Record start time
+            start_time = time.time()
             self.logger.info("Starting migration workflow", file_path=file_path, record_type=record_type)
             
             # Prepare initial workflow state with all required parameters
@@ -747,6 +912,9 @@ class MigrationWorkflow:
                 "errors": [],
                 "warnings": [],
                 "progress": 0.0,
+                "start_time": start_time,
+                "end_time": None,
+                "step_timings": {},
                 "llm_config": self.llm_config,
                 "mcp_config": self.mcp_config,
                 "final_result": None,
@@ -756,7 +924,24 @@ class MigrationWorkflow:
             # Execute the complete LangGraph workflow
             final_state = await self.graph.ainvoke(initial_state)
             
-            self.logger.info("Migration workflow completed", success=final_state["success"])
+            # Record end time and calculate total duration
+            end_time = time.time()
+            total_duration = end_time - start_time
+            
+            # Update final state with timing information
+            final_state["end_time"] = end_time
+            if "final_result" in final_state and final_state["final_result"]:
+                final_state["final_result"]["migration_summary"]["total_duration_seconds"] = total_duration
+                final_state["final_result"]["migration_summary"]["total_duration_formatted"] = str(timedelta(seconds=int(total_duration)))
+                final_state["final_result"]["migration_summary"]["start_time"] = datetime.fromtimestamp(start_time).isoformat()
+                final_state["final_result"]["migration_summary"]["end_time"] = datetime.fromtimestamp(end_time).isoformat()
+            
+            self.logger.info(
+                "Migration workflow completed", 
+                success=final_state["success"],
+                total_duration_seconds=total_duration,
+                total_duration_formatted=str(timedelta(seconds=int(total_duration)))
+            )
             
             # Return the comprehensive final result
             return final_state["final_result"]

@@ -169,17 +169,32 @@ class ValidationAgent(BaseAgent):
         schema: Dict[str, Any],
         record_type: str
     ) -> List[ValidationResult]:
-        """Validate a batch of records."""
+        """Validate a batch of records with optimized LLM calls."""
         validation_results = []
         
+        # First, do non-LLM validation for all records
         for i, record in enumerate(records):
-            record_results = await self._validate_record(record, validation_rules, schema, record_type)
+            # Schema validation
+            schema_results = await self._validate_against_schema(record, schema)
+            validation_results.extend(schema_results)
+            
+            # Business rule validation
+            for rule in validation_rules:
+                rule_results = await self._validate_rule(record, rule)
+                validation_results.extend(rule_results)
+            
+            # Cross-field validation
+            cross_field_results = await self._validate_cross_fields(record, record_type)
+            validation_results.extend(cross_field_results)
             
             # Add record index to results
-            for result in record_results:
-                result.message = f"Record {i}: {result.message}"
-            
-            validation_results.extend(record_results)
+            for result in schema_results + rule_results + cross_field_results:
+                result.message = f"Record {i + 1}: {result.message}"
+        
+        # Then, do batch LLM validation for all records at once
+        if self.llm_provider and records:
+            llm_results = await self._validate_batch_with_llm(records, record_type)
+            validation_results.extend(llm_results)
         
         return validation_results
     
@@ -517,37 +532,97 @@ class ValidationAgent(BaseAgent):
         record: Dict[str, Any],
         record_type: str
     ) -> List[ValidationResult]:
-        """Use LLM for intelligent validation."""
+        """Use LLM for intelligent validation of a single record."""
+        # This method is kept for backward compatibility but should not be used
+        # for batch processing. Use _validate_batch_with_llm instead.
+        return await self._validate_batch_with_llm([record], record_type)
+    
+    async def _validate_batch_with_llm(
+        self,
+        records: List[Dict[str, Any]],
+        record_type: str
+    ) -> List[ValidationResult]:
+        """Use LLM for intelligent validation of multiple records in a single call."""
         try:
-            # Create validation prompt
+            if not self.llm_provider or not records:
+                return []
+            
+            # Limit batch size to avoid token limits (adjust based on your model)
+            batch_size = 5  # Process 5 records at a time
+            all_results = []
+            
+            for i in range(0, len(records), batch_size):
+                batch = records[i:i + batch_size]
+                batch_results = await self._process_llm_batch(batch, record_type)
+                all_results.extend(batch_results)
+            
+            return all_results
+            
+        except Exception as e:
+            self.logger.error("Batch LLM validation failed", error=str(e))
+            return []
+    
+    async def _process_llm_batch(
+        self,
+        batch: List[Dict[str, Any]],
+        record_type: str
+    ) -> List[ValidationResult]:
+        """Process a batch of records with a single LLM call."""
+        try:
+            # Create batch validation prompt
             prompt = get_prompt(
-                "validation_check_record",
+                "validation_check_batch",
                 record_type=record_type,
-                record_data=record,
-                validation_rules="Business rules for insurance data"
+                records_data=batch,
+                validation_rules="Business rules for insurance data",
+                batch_size=len(batch)
             )
             
             system_prompt = get_system_prompt("validation")
             
-            # Get LLM response
+            # Get LLM response for the entire batch
             response = await self.llm_provider.generate(prompt, system_prompt)
             
-            # Parse LLM response (simplified)
+            # Parse LLM response and distribute results to individual records
             results = []
-            if "error" in response.lower() or "invalid" in response.lower():
-                results.append(ValidationResult(
-                    field_name="record",
-                    value=record,
-                    is_valid=False,
-                    severity=ValidationSeverity.WARNING,
-                    message=f"LLM validation warning: {response[:200]}"
-                ))
+            for i, record in enumerate(batch):
+                # Extract validation result for this specific record from the batch response
+                record_result = self._parse_batch_validation_response(response, record, i)
+                if record_result:
+                    results.append(record_result)
             
             return results
             
         except Exception as e:
-            self.logger.error("LLM validation failed", error=str(e))
+            self.logger.error("LLM batch processing failed", error=str(e))
             return []
+    
+    def _parse_batch_validation_response(
+        self,
+        response: str,
+        record: Dict[str, Any],
+        record_index: int
+    ) -> Optional[ValidationResult]:
+        """Parse LLM response for a specific record from batch validation."""
+        try:
+            # Simple parsing - look for record-specific issues
+            # In a more sophisticated implementation, you'd parse structured JSON response
+            
+            # Check if response contains warnings or errors
+            if "error" in response.lower() or "invalid" in response.lower() or "warning" in response.lower():
+                return ValidationResult(
+                    field_name="record",
+                    value=record,
+                    is_valid=True,  # Not blocking, just a warning
+                    severity=ValidationSeverity.WARNING,
+                    message=f"LLM validation warning for record {record_index + 1}: {response[:200]}"
+                )
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error("Failed to parse batch validation response", error=str(e))
+            return None
     
     async def validate_field(
         self,

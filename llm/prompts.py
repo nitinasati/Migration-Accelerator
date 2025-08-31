@@ -240,6 +240,42 @@ class PromptTemplates:
     Provide a quality score and recommendations for improvement.
     """
     
+    # Validation Agent Prompts
+    VALIDATION_CHECK_RECORD = """
+    Validate the following insurance record for data quality and business rule compliance:
+    
+    Record Type: {record_type}
+    Record Data: {record_data}
+    Validation Rules: {validation_rules}
+    
+    Please check:
+    1. Required field presence
+    2. Data format compliance
+    3. Business rule adherence
+    4. Cross-field consistency
+    5. Data type accuracy
+    
+    Provide a validation report with any issues found.
+    """
+    
+    VALIDATION_CHECK_BATCH = """
+    Validate the following batch of {batch_size} insurance records for data quality and business rule compliance:
+    
+    Record Type: {record_type}
+    Records Data: {records_data}
+    Validation Rules: {validation_rules}
+    
+    Please check each record for:
+    1. Required field presence
+    2. Data format compliance
+    3. Business rule adherence
+    4. Cross-field consistency
+    5. Data type accuracy
+    
+    Provide a validation report for each record with any issues found.
+    Format your response to clearly indicate which record (by index) has which issues.
+    """
+    
     # Business Rule Prompts
     BUSINESS_RULE_VALIDATION = """
     Validate the following data against insurance business rules:

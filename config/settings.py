@@ -116,8 +116,8 @@ class MigrationSettings(BaseSettings):
     """Main application settings."""
     
     # LLM Configuration
-    llm_provider: LLMProvider = Field(default=LLMProvider.BEDROCK, description="Default LLM provider")
-    llm_model: str = Field(default="anthropic.claude-3-5-sonnet-20240620-v1:0", description="Default LLM model")
+    llm_provider: LLMProvider = Field(default=LLMProvider.OPENAI, description="Default LLM provider")
+    llm_model: str = Field(default="gpt-4", description="Default LLM model")
     llm_temperature: float = Field(default=0.1, description="Default LLM temperature")
     llm_max_tokens: int = Field(default=4000, description="Default max tokens")
     
