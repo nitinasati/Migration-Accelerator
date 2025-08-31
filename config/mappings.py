@@ -53,6 +53,26 @@ def load_mapping_config(file_path: str) -> FieldMappingConfig:
                 if 'validation' in rule_data and rule_data['validation']:
                     rule_data['validation'] = ValidationRule(**rule_data['validation'])
                 
+                # Convert lookup table values to strings if present
+                if 'lookup_table' in rule_data and rule_data['lookup_table']:
+                    lookup_table = {}
+                    for key, value in rule_data['lookup_table'].items():
+                        # Convert boolean keys to strings
+                        if isinstance(key, bool):
+                            str_key = str(key).lower()
+                        else:
+                            str_key = str(key)
+                        
+                        # Convert boolean values to strings
+                        if isinstance(value, bool):
+                            lookup_table[str_key] = str(value).lower()
+                        else:
+                            lookup_table[str_key] = str(value)
+                    rule_data['lookup_table'] = lookup_table
+                    logger.debug("Converted lookup table", 
+                               source_field=rule_data.get('source_field', 'unknown'),
+                               lookup_table=lookup_table)
+                
                 converted_rules.append(FieldMappingRule(**rule_data))
             data['rules'] = converted_rules
         

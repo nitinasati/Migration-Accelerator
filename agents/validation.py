@@ -60,9 +60,18 @@ class ValidationAgent(BaseAgent):
         await super().start()
         
         if self.llm_config:
-            self.llm_provider = LLMProviderFactory.create(self.llm_config, self.agent_name)
-            await self.llm_provider.initialize()
-            self.logger.info("LLM provider initialized for validation agent")
+            try:
+                self.llm_provider = LLMProviderFactory.create(self.llm_config, self.agent_name)
+                await self.llm_provider.initialize()
+                self.logger.info("LLM provider initialized for validation agent")
+            except ImportError as e:
+                self.logger.warning(f"LLM provider not available: {e}")
+                self.logger.info("Running without LLM enhancements")
+                self.llm_provider = None
+            except Exception as e:
+                self.logger.error(f"Failed to initialize LLM provider: {e}")
+                self.logger.info("Running without LLM enhancements")
+                self.llm_provider = None
         
         self.logger.info("Validation agent initialized")
     
@@ -328,9 +337,27 @@ class ValidationAgent(BaseAgent):
         if expected_type == "string":
             return isinstance(value, str)
         elif expected_type == "number":
-            return isinstance(value, (int, float))
+            # Allow both actual numbers and string representations of numbers
+            if isinstance(value, (int, float)):
+                return True
+            elif isinstance(value, str):
+                try:
+                    float(value)
+                    return True
+                except (ValueError, TypeError):
+                    return False
+            return False
         elif expected_type == "integer":
-            return isinstance(value, int)
+            # Allow both actual integers and string representations of integers
+            if isinstance(value, int):
+                return True
+            elif isinstance(value, str):
+                try:
+                    int(value)
+                    return True
+                except (ValueError, TypeError):
+                    return False
+            return False
         elif expected_type == "boolean":
             return isinstance(value, bool)
         elif expected_type == "array":
@@ -345,24 +372,31 @@ class ValidationAgent(BaseAgent):
     async def _validate_rule(
         self,
         record: Dict[str, Any],
-        rule: ValidationRule
+        rule: Dict[str, Any]
     ) -> List[ValidationResult]:
         """Validate against a specific validation rule."""
         results = []
         
+        # Extract field name and validation rule
+        field_name = rule.get("field_name")
+        validation_rule = rule.get("validation_rule")
+        
+        if not field_name or not validation_rule:
+            return results
+        
         # This is a simplified implementation
         # In a real system, you would have more sophisticated rule evaluation
         
-        if rule.required:
+        if validation_rule.required:
             # Check if field is present and not empty
-            field_value = record.get(rule.pattern)  # Using pattern as field name for demo
+            field_value = record.get(field_name)
             if field_value is None or field_value == "":
                 results.append(ValidationResult(
-                    field_name=rule.pattern,
+                    field_name=field_name,
                     value=field_value,
                     is_valid=False,
                     severity=ValidationSeverity.ERROR,
-                    message=f"Required field '{rule.pattern}' is missing"
+                    message=f"Required field '{field_name}' is missing"
                 ))
         
         return results

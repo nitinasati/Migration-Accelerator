@@ -97,7 +97,7 @@ rules:
   - source_field: benefit_percentage
     target_field: benefitPercentage
     transformation_type: conditional
-    condition: "if source_value and float(source_value) > 0 else 60.0"
+    condition: "float(source_value) if source_value and float(source_value) > 0 else 60.0"
     validation:
       required: false
       min_value: 0.0
@@ -124,10 +124,10 @@ rules:
     target_field: preExistingCondition
     transformation_type: lookup
     lookup_table:
-      yes: true
-      no: false
-      Y: true
-      N: false
+      yes: "true"
+      no: "false"
+      Y: "true"
+      N: "false"
     validation:
       required: false
 

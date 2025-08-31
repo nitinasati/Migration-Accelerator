@@ -48,9 +48,18 @@ class FileReaderAgent(BaseAgent):
         await super().start()
         
         if self.llm_config:
-            self.llm_provider = LLMProviderFactory.create(self.llm_config, self.agent_name)
-            await self.llm_provider.initialize()
-            self.logger.info("LLM provider initialized for file reader")
+            try:
+                self.llm_provider = LLMProviderFactory.create(self.llm_config, self.agent_name)
+                await self.llm_provider.initialize()
+                self.logger.info("LLM provider initialized for file reader")
+            except ImportError as e:
+                self.logger.warning(f"LLM provider not available: {e}")
+                self.logger.info("Running without LLM enhancements")
+                self.llm_provider = None
+            except Exception as e:
+                self.logger.error(f"Failed to initialize LLM provider: {e}")
+                self.logger.info("Running without LLM enhancements")
+                self.llm_provider = None
         
         self.logger.info("File reader agent initialized")
     

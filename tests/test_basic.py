@@ -9,7 +9,7 @@ from pathlib import Path
 
 from config.settings import settings, LLMConfig, MCPConfig
 from llm.providers import LLMProviderFactory
-from mcp.client import MCPToolManager
+from mcp_tools.client import MCPToolManager
 from config.mappings import create_default_mapping_config, validate_mapping_config
 
 
@@ -24,14 +24,16 @@ class TestConfiguration:
     
     def test_llm_config_creation(self):
         """Test LLM configuration creation."""
-        llm_config = settings.get_llm_config()
+        from config.settings import get_llm_config
+        llm_config = get_llm_config()
         assert llm_config is not None
         assert llm_config.provider is not None
         assert llm_config.model is not None
     
     def test_mcp_config_creation(self):
         """Test MCP configuration creation."""
-        mcp_config = settings.get_mcp_config()
+        from config.settings import get_mcp_config
+        mcp_config = get_mcp_config()
         assert mcp_config is not None
         assert mcp_config.server_url is not None
         assert mcp_config.timeout > 0
@@ -67,7 +69,8 @@ class TestMappingConfiguration:
 class TestFileReader:
     """Test file reader functionality."""
     
-    def test_file_detection(self):
+    @pytest.mark.asyncio
+    async def test_file_detection(self):
         """Test file format detection."""
         from agents.file_reader import FileReaderAgent
         
@@ -76,7 +79,7 @@ class TestFileReader:
         # Test CSV detection
         csv_path = "data/input/sample_disability_data.csv"
         if os.path.exists(csv_path):
-            format_detected = file_reader._detect_file_format(csv_path, None)
+            format_detected = await file_reader._detect_file_format(csv_path, None)
             assert format_detected is not None
     
     @pytest.mark.asyncio
@@ -88,7 +91,8 @@ class TestFileReader:
         csv_path = "data/input/sample_disability_data.csv"
         
         if os.path.exists(csv_path):
-            records = await file_reader._read_csv(csv_path, None, None)
+            context = {"encoding": "utf-8"}
+            records = await file_reader._read_csv(csv_path, None, context)
             assert isinstance(records.data, list)
             assert len(records.data) > 0
             assert isinstance(records.data[0], dict)
@@ -282,7 +286,10 @@ class TestMigrationWorkflow:
         """Test migration workflow creation."""
         from workflows.migration_graph import MigrationWorkflow
         
-        workflow = MigrationWorkflow()
+        from config.settings import get_llm_config, get_mcp_config
+        llm_config = get_llm_config()
+        mcp_config = get_mcp_config()
+        workflow = MigrationWorkflow(llm_config, mcp_config)
         assert workflow is not None
         assert workflow.graph is not None
     
@@ -336,7 +343,10 @@ class TestIntegration:
         mapping_config = load_mapping_config(mapping_file)
         
         # Create workflow
-        workflow = MigrationWorkflow()
+        from config.settings import get_llm_config, get_mcp_config
+        llm_config = get_llm_config()
+        mcp_config = get_mcp_config()
+        workflow = MigrationWorkflow(llm_config, mcp_config)
         
         # Run workflow (dry run)
         result = await workflow.run(

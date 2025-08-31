@@ -57,9 +57,18 @@ class OrchestrationAgent(BaseAgent):
         await super().start()
         
         if self.llm_config:
-            self.llm_provider = LLMProviderFactory.create(self.llm_config, self.agent_name)
-            await self.llm_provider.initialize()
-            self.logger.info("LLM provider initialized for orchestration agent")
+            try:
+                self.llm_provider = LLMProviderFactory.create(self.llm_config, self.agent_name)
+                await self.llm_provider.initialize()
+                self.logger.info("LLM provider initialized for orchestration agent")
+            except ImportError as e:
+                self.logger.warning(f"LLM provider not available: {e}")
+                self.logger.info("Running without LLM enhancements")
+                self.llm_provider = None
+            except Exception as e:
+                self.logger.error(f"Failed to initialize LLM provider: {e}")
+                self.logger.info("Running without LLM enhancements")
+                self.llm_provider = None
         
         # Initialize all sub-agents
         await self.file_reader.initialize()

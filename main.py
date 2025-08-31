@@ -17,9 +17,9 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 
-from config.settings import settings, LLMConfig, MCPConfig, FieldMappingConfig
+from config.settings import settings, LLMConfig, MCPConfig, FieldMappingConfig, get_llm_config, get_mcp_config, get_langsmith_config
 from llm.providers import LLMProviderFactory
-from mcp.client import MCPToolManager
+from mcp_tools.client import MCPToolManager
 from workflows.migration_graph import MigrationWorkflow
 from config.mappings import load_mapping_config
 
@@ -32,6 +32,12 @@ app = typer.Typer(
 
 # Initialize Rich console
 console = Console()
+
+# Status constants
+STATUS_CONFIGURED = "✓ Configured"
+STATUS_NOT_CONFIGURED = "⚠ Not Configured"
+STATUS_AVAILABLE = "✓ Available"
+STATUS_MISSING = "⚠ Missing"
 
 
 @app.command()
@@ -108,13 +114,13 @@ def validate(
             raise typer.Exit(1)
         
         try:
-            mapping_config = load_mapping_config(mapping_file)
-            console.print(f"[green]✓[/green] Mapping configuration is valid")
+            load_mapping_config(mapping_file)
+            console.print("[green]✓[/green] Mapping configuration is valid")
         except Exception as e:
             console.print(f"[red]Error in mapping configuration: {e}[/red]")
             raise typer.Exit(1)
     
-    console.print(f"[green]✓[/green] File validation completed successfully")
+    console.print("[green]✓[/green] File validation completed successfully")
 
 
 @app.command()
@@ -133,19 +139,19 @@ def status():
     table.add_column("Details")
     
     # LLM Configuration
-    llm_config = settings.get_llm_config()
-    table.add_row("LLM Provider", "✓ Configured", f"{llm_config.provider.value} - {llm_config.model}")
+    llm_config = get_llm_config()
+    table.add_row("LLM Provider", STATUS_CONFIGURED, f"{llm_config.provider.value} - {llm_config.model}")
     
     # MCP Configuration
-    mcp_config = settings.get_mcp_config()
-    table.add_row("MCP Client", "✓ Configured", f"Server: {mcp_config.server_url}")
+    mcp_config = get_mcp_config()
+    table.add_row("MCP Client", STATUS_CONFIGURED, f"Server: {mcp_config.server_url}")
     
     # LangSmith Configuration
-    langsmith_config = settings.get_langsmith_config()
+    langsmith_config = get_langsmith_config()
     if langsmith_config.api_key:
-        table.add_row("LangSmith", "✓ Configured", f"Project: {langsmith_config.project}")
+        table.add_row("LangSmith", STATUS_CONFIGURED, f"Project: {langsmith_config.project}")
     else:
-        table.add_row("LangSmith", "⚠ Not Configured", "API key not set")
+        table.add_row("LangSmith", STATUS_NOT_CONFIGURED, "API key not set")
     
     # Sample data files
     sample_files = [
@@ -155,9 +161,9 @@ def status():
     
     for sample_file in sample_files:
         if os.path.exists(sample_file):
-            table.add_row(f"Sample Data ({Path(sample_file).stem})", "✓ Available", sample_file)
+            table.add_row(f"Sample Data ({Path(sample_file).stem})", STATUS_AVAILABLE, sample_file)
         else:
-            table.add_row(f"Sample Data ({Path(sample_file).stem})", "⚠ Missing", sample_file)
+            table.add_row(f"Sample Data ({Path(sample_file).stem})", STATUS_MISSING, sample_file)
     
     # Mapping files
     mapping_files = [
@@ -167,9 +173,9 @@ def status():
     
     for mapping_file in mapping_files:
         if os.path.exists(mapping_file):
-            table.add_row(f"Mapping Config ({Path(mapping_file).stem})", "✓ Available", mapping_file)
+            table.add_row(f"Mapping Config ({Path(mapping_file).stem})", STATUS_AVAILABLE, mapping_file)
         else:
-            table.add_row(f"Mapping Config ({Path(mapping_file).stem})", "⚠ Missing", mapping_file)
+            table.add_row(f"Mapping Config ({Path(mapping_file).stem})", STATUS_MISSING, mapping_file)
     
     console.print(table)
 
@@ -211,13 +217,13 @@ def logs(
         border_style="blue"
     ))
     
-    langsmith_config = settings.get_langsmith_config()
+    langsmith_config = get_langsmith_config()
     if not langsmith_config.api_key:
         console.print("[red]Error: LangSmith API key not configured[/red]")
         raise typer.Exit(1)
     
     console.print(f"[green]✓[/green] LangSmith configured for project: {project}")
-    console.print(f"[yellow]Note: Use LangSmith web interface to view detailed logs[/yellow]")
+    console.print("[yellow]Note: Use LangSmith web interface to view detailed logs[/yellow]")
 
 
 async def _run_migration(
@@ -231,8 +237,8 @@ async def _run_migration(
     
     try:
         # Initialize workflow
-        llm_config = settings.get_llm_config()
-        mcp_config = settings.get_mcp_config()
+        llm_config = get_llm_config()
+        mcp_config = get_mcp_config()
         
         workflow = MigrationWorkflow(llm_config, mcp_config)
         
@@ -351,7 +357,7 @@ def _display_migration_results(result: dict, verbose: bool):
             if isinstance(api_results, dict) and "api_results" in api_results:
                 console.print(f"  [cyan]API Results:[/cyan] {len(api_results['api_results'])} records")
             else:
-                console.print(f"  [cyan]API Results:[/cyan] Available")
+                console.print("  [cyan]API Results:[/cyan] Available")
 
 
 if __name__ == "__main__":

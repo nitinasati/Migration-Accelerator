@@ -116,8 +116,8 @@ class MigrationSettings(BaseSettings):
     """Main application settings."""
     
     # LLM Configuration
-    llm_provider: LLMProvider = Field(default=LLMProvider.OPENAI, description="Default LLM provider")
-    llm_model: str = Field(default="gpt-4", description="Default LLM model")
+    llm_provider: LLMProvider = Field(default=LLMProvider.BEDROCK, description="Default LLM provider")
+    llm_model: str = Field(default="anthropic.claude-3-5-sonnet-20240620-v1:0", description="Default LLM model")
     llm_temperature: float = Field(default=0.1, description="Default LLM temperature")
     llm_max_tokens: int = Field(default=4000, description="Default max tokens")
     
@@ -130,6 +130,7 @@ class MigrationSettings(BaseSettings):
     
     # LangSmith Configuration
     langsmith_api_key: Optional[str] = Field(None, description="LangSmith API key")
+    langchain_api_key: Optional[str] = Field(None, description="LangChain API key (alias for langsmith_api_key)")
     langsmith_project: str = Field(default="migration-accelerators", description="LangSmith project")
     langsmith_tracing_v2: bool = Field(default=True, description="Enable LangSmith tracing")
     
@@ -182,8 +183,11 @@ def get_mcp_config() -> MCPConfig:
 
 def get_langsmith_config() -> LangSmithConfig:
     """Get LangSmith configuration from settings."""
+    # Use langsmith_api_key first, fallback to langchain_api_key
+    api_key = settings.langsmith_api_key or settings.langchain_api_key
+    
     return LangSmithConfig(
-        api_key=settings.langsmith_api_key,
+        api_key=api_key,
         project=settings.langsmith_project,
         tracing_v2=settings.langsmith_tracing_v2
     )

@@ -1,32 +1,166 @@
-rules:
-  - Enforce PEP8 + type hints in all Python files.
-  - Use Pydantic models for all input/output validation.
-  - Never commit AWS credentials; use IAM roles or environment variables.
-  - Log only structured JSON, never raw secrets.
-  - All AWS SDK calls must implement retries + backoff (future rule).
-  - Push notifications must always go through SNS wrapper.
-  - Large payloads go to S3 with presigned URL instead of logs or memory.
-  - Unit tests required for agent logic and AWS utils.
-  - Keep a common file and functions with connection URLs, credentials and reusable components. e.g. making API calls, LLM model names etc.
+# Migration-Accelerators - Cursor Rules
 
-  example project structure:
-  agentic-ai-app/
-    │── src/
-    │   ├── main.py              # entrypoint
-    │   ├── agent.py             # agent logic
-    │   ├── models.py            # Pydantic schemas
-    │   ├── aws_utils.py         # AWS wrappers (SQS, SNS, S3, etc.)
-    │   ├── notifications.py     # push notification logic
-    │   ├── logging_config.py    # structured logging setup
-    │   └── config.py            # env + secrets mgmt
-    │
-    │── tests/
-    │   ├── test_agent.py
-    │   ├── test_models.py
-    │   └── test_aws_utils.py
-    │
-    │── requirements.txt
-    │── .cursorrules.yaml
-    │── README.md
+## Code Style & Formatting
+Follow Python's official style guides and enforce auto-formatting.
 
+- Always follow PEP 8 coding style
+- Enforce line length ≤ 100 characters
+- Use auto-formatters (black) and linters (flake8, ruff, pylint)
+- Variable, class, and function names must be descriptive
+- Use type hints for functions, classes, and return values
 
+## Project Structure
+Maintain a clean, consistent, and scalable project layout.
+
+- Follow a standard folder structure with src/, tests/, docs/
+- Use __init__.py for package imports
+- Each function/class should follow the Single Responsibility Principle (SRP)
+
+## Documentation & Comments
+Ensure maintainability with proper documentation.
+
+- Every module, class, and function must have a docstring (PEP 257)
+- Use Google-style or NumPy-style docstrings
+- Comments should explain WHY, not just WHAT
+- Provide README.md with clear setup & usage
+
+## Testing & Quality
+Write robust automated tests and enforce CI/CD checks.
+
+- Use pytest as the testing framework
+- Follow Arrange-Act-Assert (AAA) structure
+- Target ≥ 70% coverage with meaningful tests
+- Use fixtures for reusable test setups
+- All tests must run successfully in CI
+
+## Error Handling & Logging
+Ensure robust error handling and structured observability.
+
+- Never use bare except; catch specific exceptions
+- Create custom exception classes when appropriate
+- Always use the logging module (or structlog) instead of print
+- Log errors with context and exc_info
+
+## Security
+Secure code and dependency management practices.
+
+- Never hardcode secrets; load via env variables or secret manager
+- Avoid unsafe functions (eval, pickle)
+- Sanitize inputs and validate external data
+- Run pip-audit / safety checks on dependencies
+
+## Performance & Scalability
+Optimize responsibly for performance and large-scale data.
+
+- Prefer list comprehensions and generators
+- Use async/await for IO-bound operations
+- Use multiprocessing/concurrent.futures for CPU-bound tasks
+- Use profiling tools (timeit, cProfile) before optimization
+
+## Dependency & Environment Management
+
+- Use virtual environments (venv, pipenv, or poetry)
+- Pin dependencies in requirements.txt or pyproject.toml
+- Use semantic versioning (~=1.2.3)
+- Audit dependencies for vulnerabilities
+
+## Version Control & CI/CD
+
+- Use feature branches and submit PRs for all changes
+- Enforce pre-commit hooks (lint, format, tests)
+- All commits must be atomic and meaningful
+- All PRs must pass CI/CD before merge
+
+## Architecture & Design
+Follow proven design principles and patterns.
+
+- Apply SOLID principles
+- Favor composition over inheritance
+- Use dependency injection for flexibility and testability
+- Apply design patterns where relevant
+
+## Key Software Design Patterns
+Use common patterns to solve recurring design problems.
+
+- **Singleton** → For config/caches where a single instance is needed
+- **Factory Method** → For decoupling object creation
+- **Strategy** → For interchangeable algorithms or policies
+- **Observer** → For event-driven, pub-sub systems
+- **Builder** → For step-by-step object construction
+- **Adapter** → For integrating incompatible interfaces
+- **State** → For state-driven behavior instead of conditionals
+
+*Note: Use patterns only where they simplify code, not to add unnecessary complexity.*
+
+## Monitoring & Observability
+
+- Use structured logging (JSON format in production)
+- Track metrics with Prometheus/StatsD
+- Implement tracing with OpenTelemetry/Jaeger
+- Provide health/status endpoints for services
+
+## Code Review Practices
+
+- PRs must be small, focused, and well-documented
+- Include relevant tests and documentation updates
+- Code must be readable, maintainable, and secure
+- At least one reviewer approval required
+
+## Migration-Accelerators Specific Rules
+
+### Agent Development
+- All agents must inherit from BaseAgent class
+- Implement proper error handling and retry logic
+- Use structured logging with context
+- Support async operations where applicable
+- Include comprehensive type hints
+
+### LLM Integration
+- Support multiple LLM providers (OpenAI, Bedrock, Anthropic, Google)
+- Use provider abstraction layer
+- Implement proper prompt management
+- Log all LLM calls through LangSmith
+
+### Data Processing
+- Validate all input data using Pydantic models
+- Implement field mapping validation
+- Handle data transformation errors gracefully
+- Support multiple input/output formats (CSV, JSON, XML, etc.)
+
+### MCP Integration
+- Use MCP (Model Context Protocol) for API calls
+- Implement proper state management between agents
+- Use LangGraph for workflow orchestration
+- Maintain agent state persistence
+
+### File Organization
+```
+migration-accelerators/
+├── agents/           # Agent implementations
+├── workflows/        # LangGraph workflows
+├── llm/             # LLM provider abstractions
+├── mcp/             # MCP client implementations
+├── config/          # Configuration and settings
+├── tests/           # Test suites
+├── data/            # Sample data and outputs
+└── docs/            # Documentation
+```
+
+### Constants and Configuration
+- Define constants for repeated string literals
+- Use environment variables for configuration
+- Implement proper configuration validation
+- Support multiple environments (dev, staging, prod)
+
+### Error Handling Patterns
+- Use custom exception classes for domain-specific errors
+- Implement retry logic with exponential backoff
+- Provide detailed error messages for debugging
+- Log all errors with structured format
+
+### Testing Requirements
+- Unit tests for all agent logic
+- Integration tests for workflow orchestration
+- Mock external dependencies (LLM providers, APIs)
+- Test error handling and edge cases
+- Validate data transformation accuracy

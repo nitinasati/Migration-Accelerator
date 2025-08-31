@@ -310,7 +310,7 @@ def get_validation_schema(record_type: str) -> Dict[str, Any]:
                 "employee_id": {"type": "string", "pattern": "^EMP[0-9]{6}$"},
                 "effective_date": {"type": "string", "format": "date"},
                 "benefit_amount": {"type": "number", "minimum": 0},
-                "status": {"type": "string", "enum": ["active", "inactive", "pending", "cancelled"]}
+                "status": {"type": "string", "enum": ["active", "inactive", "pending", "cancelled", "suspended", "terminated"]}
             }
         },
         "absence": {

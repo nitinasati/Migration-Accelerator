@@ -10,7 +10,7 @@ from .base_agent import BaseAgent, AgentResult
 from config.settings import LLMConfig, MCPConfig
 from llm.providers import BaseLLMProvider, LLMProviderFactory
 from llm.prompts import get_prompt, get_system_prompt
-from mcp.client import MCPToolManager
+from mcp_tools.client import MCPToolManager
 
 
 class APIIntegrationAgent(BaseAgent):
@@ -41,9 +41,18 @@ class APIIntegrationAgent(BaseAgent):
         await super().start()
         
         if self.llm_config:
-            self.llm_provider = LLMProviderFactory.create(self.llm_config, self.agent_name)
-            await self.llm_provider.initialize()
-            self.logger.info("LLM provider initialized for API integration agent")
+            try:
+                self.llm_provider = LLMProviderFactory.create(self.llm_config, self.agent_name)
+                await self.llm_provider.initialize()
+                self.logger.info("LLM provider initialized for API integration agent")
+            except ImportError as e:
+                self.logger.warning(f"LLM provider not available: {e}")
+                self.logger.info("Running without LLM enhancements")
+                self.llm_provider = None
+            except Exception as e:
+                self.logger.error(f"Failed to initialize LLM provider: {e}")
+                self.logger.info("Running without LLM enhancements")
+                self.llm_provider = None
         
         if self.mcp_config:
             self.mcp_manager = MCPToolManager(self.mcp_config)
@@ -116,6 +125,8 @@ class APIIntegrationAgent(BaseAgent):
             base_url = context.get("base_url", "https://api.insurance-system.com") if context else "https://api.insurance-system.com"
             batch_size = context.get("batch_size", 10) if context else 10
             authentication = context.get("authentication", {}) if context else {}
+            output_mode = context.get("output_mode", "api") if context else "api"  # "api" or "file"
+            output_dir = context.get("output_dir", "data/output") if context else "data/output"
             
             # Get endpoint configuration
             endpoint_config = self.api_endpoints.get(endpoint_name)
@@ -125,15 +136,22 @@ class APIIntegrationAgent(BaseAgent):
                     errors=[f"Unknown endpoint: {endpoint_name}"]
                 )
             
-            # Process data
-            if isinstance(data, list):
-                api_results = await self._process_batch(
-                    data, endpoint_config, base_url, batch_size, authentication
+            # Process data based on output mode
+            if output_mode == "file":
+                # Write to JSON file instead of making API calls
+                api_results = await self._write_to_file(
+                    data, endpoint_name, output_dir, context
                 )
             else:
-                api_results = await self._process_single_record(
-                    data, endpoint_config, base_url, authentication
-                )
+                # Make API calls (original behavior)
+                if isinstance(data, list):
+                    api_results = await self._process_batch(
+                        data, endpoint_config, base_url, batch_size, authentication
+                    )
+                else:
+                    api_results = await self._process_single_record(
+                        data, endpoint_config, base_url, authentication
+                    )
             
             # Analyze results
             success_count = sum(1 for result in api_results if result.get("success", False))
@@ -576,6 +594,86 @@ class APIIntegrationAgent(BaseAgent):
         }
         
         self.logger.info("API endpoint registered", endpoint_name=name, url=url)
+    
+    async def _write_to_file(
+        self,
+        data: Union[Dict[str, Any], List[Dict[str, Any]]],
+        endpoint_name: str,
+        output_dir: str,
+        context: Optional[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Write data to JSON file instead of making API calls.
+        
+        Args:
+            data: Data to write (single record or list of records)
+            endpoint_name: Name of the endpoint (used for filename)
+            output_dir: Directory to write the file to
+            context: Additional context information
+            
+        Returns:
+            List[Dict[str, Any]]: List of results indicating success/failure
+        """
+        try:
+            import json
+            import os
+            from datetime import datetime
+            
+            # Ensure output directory exists
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # Generate filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{endpoint_name}_{timestamp}.json"
+            filepath = os.path.join(output_dir, filename)
+            
+            # Prepare data for writing
+            if isinstance(data, str):
+                # If data is already a JSON string, parse it first
+                try:
+                    json_data = json.loads(data)
+                except json.JSONDecodeError:
+                    json_data = {"raw_data": data}
+            else:
+                json_data = data
+            
+            # Add metadata
+            output_data = {
+                "metadata": {
+                    "endpoint": endpoint_name,
+                    "timestamp": datetime.now().isoformat(),
+                    "record_count": len(json_data) if isinstance(json_data, list) else 1,
+                    "output_mode": "file",
+                    "file_path": filepath
+                },
+                "data": json_data
+            }
+            
+            # Write to file
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(output_data, f, indent=2, ensure_ascii=False)
+            
+            self.logger.info(
+                "Data written to file successfully",
+                filepath=filepath,
+                record_count=len(json_data) if isinstance(json_data, list) else 1
+            )
+            
+            # Return success result
+            return [{
+                "success": True,
+                "file_path": filepath,
+                "record_count": len(json_data) if isinstance(json_data, list) else 1,
+                "message": f"Data successfully written to {filepath}"
+            }]
+            
+        except Exception as e:
+            self.logger.error("Failed to write data to file", error=str(e))
+            return [{
+                "success": False,
+                "error": str(e),
+                "message": f"Failed to write data to file: {str(e)}"
+            }]
     
     async def close(self) -> None:
         """Close the API integration agent."""

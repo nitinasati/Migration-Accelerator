@@ -31,7 +31,8 @@ class AgentMessage:
         self.data = data
         self.metadata = metadata or {}
         self.correlation_id = correlation_id or str(uuid.uuid4())
-        self.timestamp = datetime.utcnow()
+        from datetime import timezone
+        self.timestamp = datetime.now(timezone.utc)
         self.status = "pending"
 
 
@@ -51,7 +52,8 @@ class AgentResult:
         self.errors = errors or []
         self.warnings = warnings or []
         self.metadata = metadata or {}
-        self.timestamp = datetime.utcnow()
+        from datetime import timezone
+        self.timestamp = datetime.now(timezone.utc)
 
 
 class BaseAgent(ABC):
@@ -344,6 +346,12 @@ class BaseAgent(ABC):
     def __str__(self) -> str:
         """String representation of the agent."""
         return f"{self.__class__.__name__}(name={self.agent_name})"
+    
+    async def close(self) -> None:
+        """Close the agent and clean up resources."""
+        if self.is_running:
+            await self.stop()
+        self.logger.info("Agent closed", agent=self.agent_name)
     
     def __repr__(self) -> str:
         """Detailed string representation of the agent."""

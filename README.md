@@ -1,4 +1,4 @@
-# Migration-Accelerators
+# Migration-Accelerator
 
 A modern, LLM-agnostic platform for accelerating data migration projects using Agentic AI, Google's A2A framework, LangGraph, and MCP. This platform leverages intelligent agents to automate complex migration workflows across various domains and data formats.
 

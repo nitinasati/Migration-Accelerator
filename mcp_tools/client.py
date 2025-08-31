@@ -53,7 +53,7 @@ class MCPClient:
             )
             
             # Register default tools
-            await self._register_default_tools()
+            self._register_default_tools()
             
             self.logger.info("MCP client initialized", server_url=self.config.server_url)
             
@@ -61,7 +61,7 @@ class MCPClient:
             self.logger.error("Failed to initialize MCP client", error=str(e))
             raise
     
-    async def _register_default_tools(self) -> None:
+    def _register_default_tools(self) -> None:
         """Register default MCP tools."""
         # API Call Tool
         api_tool = APICallTool()

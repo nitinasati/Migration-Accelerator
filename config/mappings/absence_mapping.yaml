@@ -84,12 +84,12 @@ rules:
     target_field: medicalCertificate
     transformation_type: lookup
     lookup_table:
-      yes: true
-      no: false
-      Y: true
-      N: false
-      required: true
-      not_required: false
+      yes: "true"
+      no: "false"
+      Y: "true"
+      N: "false"
+      required: "true"
+      not_required: "false"
     validation:
       required: false
 
@@ -122,10 +122,10 @@ rules:
     target_field: partialReturn
     transformation_type: lookup
     lookup_table:
-      yes: true
-      no: false
-      Y: true
-      N: false
+      yes: "true"
+      no: "false"
+      Y: "true"
+      N: "false"
     validation:
       required: false
 

@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from config.settings import settings, LLMConfig, MCPConfig
 from llm.providers import LLMProviderFactory
-from mcp.client import MCPToolManager
+from mcp_tools.client import MCPToolManager
 from workflows.migration_graph import MigrationWorkflow
 from config.mappings import load_mapping_config, create_default_mapping_config
 
@@ -59,7 +59,7 @@ async def example_migration():
         mapping_config = load_mapping_config(mapping_file)
         print(f"   ✓ Mapping configuration loaded from {mapping_file}")
     except FileNotFoundError:
-        print(f"   ⚠ Mapping file not found, creating default...")
+        print("   ⚠ Mapping file not found, creating default...")
         mapping_config = create_default_mapping_config("disability")
         print("   ✓ Default mapping configuration created")
     
