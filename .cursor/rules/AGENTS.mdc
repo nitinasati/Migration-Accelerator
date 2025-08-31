@@ -1,0 +1,64 @@
+---
+description: "Agent development rules and guidelines for Migration-Accelerators platform"
+globs: ["**/*.py", "**/agents/**", "**/workflows/**", "**/llm/**", "**/mcp/**"]
+alwaysApply: true
+---
+
+# Agent Development Rules
+
+## Core Development Standards
+
+- **Enforce PEP8 + type hints in all Python files**
+- **Use Pydantic models for all input/output validation**
+- **Never commit AWS credentials; use IAM roles or environment variables**
+- **Log only structured JSON, never raw secrets**
+- **All AWS SDK calls must implement retries + backoff (future rule)**
+- **Push notifications must always go through SNS wrapper**
+- **Large payloads go to S3 with presigned URL instead of logs or memory**
+- **Unit tests required for agent logic and AWS utils**
+- **Keep a common file and functions with connection URLs, credentials and reusable components. e.g. making API calls, LLM model names etc.**
+
+## Agent Architecture Guidelines
+
+### Base Agent Requirements
+- All agents must inherit from `BaseAgent` class
+- Implement proper error handling and retry logic
+- Use structured logging with context
+- Support async operations where applicable
+- Include comprehensive type hints
+
+### Agent Communication
+- Use MCP (Model Context Protocol) for API calls
+- Implement proper state management between agents
+- Use LangGraph for workflow orchestration
+- Maintain agent state persistence
+
+### LLM Integration
+- Support multiple LLM providers (OpenAI, Bedrock, Anthropic, Google)
+- Use provider abstraction layer
+- Implement proper prompt management
+- Log all LLM calls through LangSmith
+
+
+## Migration-Specific Rules
+
+### Data Processing
+- Validate all input data using Pydantic models
+- Implement field mapping validation
+- Handle data transformation errors gracefully
+- Support multiple input/output formats (CSV, JSON, XML, etc.)
+
+### Error Handling
+- Log all errors with structured format
+- Implement proper error recovery mechanisms
+- Provide detailed error messages for debugging
+- Track error statistics and patterns
+
+### Performance
+- Use async operations for I/O bound tasks
+- Implement proper caching strategies
+- Monitor memory usage for large datasets
+- Optimize database queries and API calls
+
+
+

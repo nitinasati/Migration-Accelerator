@@ -1,0 +1,155 @@
+source_format: csv
+target_format: json
+record_type: absence
+version: "1.0"
+description: "Field mapping for absence management records from legacy system to modern platform"
+
+rules:
+  - source_field: employee_id
+    target_field: employeeId
+    transformation_type: direct
+    validation:
+      required: true
+      pattern: "^EMP[0-9]{6}$"
+
+  - source_field: absence_id
+    target_field: absenceId
+    transformation_type: direct
+    validation:
+      required: true
+      pattern: "^ABS[0-9]{8}$"
+
+  - source_field: absence_start_date
+    target_field: startDate
+    transformation_type: date_format
+    source_format: "%Y-%m-%d"
+    target_format: "ISO8601"
+    validation:
+      required: true
+      future_date: false
+
+  - source_field: absence_end_date
+    target_field: endDate
+    transformation_type: date_format
+    source_format: "%Y-%m-%d"
+    target_format: "ISO8601"
+    validation:
+      required: false
+      future_date: true
+
+  - source_field: absence_type
+    target_field: absenceType
+    transformation_type: lookup
+    lookup_table:
+      sick: "SICK_LEAVE"
+      vacation: "VACATION"
+      personal: "PERSONAL_LEAVE"
+      maternity: "MATERNITY_LEAVE"
+      paternity: "PATERNITY_LEAVE"
+      bereavement: "BEREAVEMENT_LEAVE"
+      jury: "JURY_DUTY"
+      military: "MILITARY_LEAVE"
+    validation:
+      required: true
+
+  - source_field: duration_days
+    target_field: durationDays
+    transformation_type: calculated
+    calculation_formula: "int(source_value) if source_value else 0"
+    validation:
+      required: true
+      min_value: 1
+      max_value: 365
+
+  - source_field: status
+    target_field: status
+    transformation_type: lookup
+    lookup_table:
+      pending: "PENDING"
+      approved: "APPROVED"
+      denied: "DENIED"
+      cancelled: "CANCELLED"
+      completed: "COMPLETED"
+    validation:
+      required: true
+
+  - source_field: reason
+    target_field: reason
+    transformation_type: direct
+    validation:
+      required: false
+      max_length: 500
+
+  - source_field: medical_certificate
+    target_field: medicalCertificate
+    transformation_type: lookup
+    lookup_table:
+      yes: true
+      no: false
+      Y: true
+      N: false
+      required: true
+      not_required: false
+    validation:
+      required: false
+
+  - source_field: approval_manager
+    target_field: approvalManager
+    transformation_type: direct
+    validation:
+      required: false
+      pattern: "^MGR[0-9]{6}$"
+
+  - source_field: approval_date
+    target_field: approvalDate
+    transformation_type: date_format
+    source_format: "%Y-%m-%d"
+    target_format: "ISO8601"
+    validation:
+      required: false
+      future_date: false
+
+  - source_field: return_to_work_date
+    target_field: returnToWorkDate
+    transformation_type: date_format
+    source_format: "%Y-%m-%d"
+    target_format: "ISO8601"
+    validation:
+      required: false
+      future_date: true
+
+  - source_field: partial_return
+    target_field: partialReturn
+    transformation_type: lookup
+    lookup_table:
+      yes: true
+      no: false
+      Y: true
+      N: false
+    validation:
+      required: false
+
+  - source_field: work_hours_per_day
+    target_field: workHoursPerDay
+    transformation_type: calculated
+    calculation_formula: "float(source_value) if source_value else 8.0"
+    validation:
+      required: false
+      min_value: 0.0
+      max_value: 24.0
+
+  - source_field: created_date
+    target_field: metadata.createdAt
+    transformation_type: date_format
+    source_format: "%Y-%m-%d %H:%M:%S"
+    target_format: "ISO8601"
+    validation:
+      required: false
+
+  - source_field: last_modified
+    target_field: metadata.updatedAt
+    transformation_type: date_format
+    source_format: "%Y-%m-%d %H:%M:%S"
+    target_format: "ISO8601"
+    validation:
+      required: false

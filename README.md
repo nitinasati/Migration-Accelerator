@@ -44,7 +44,7 @@ cd Migration-Accelerators
 pip install -r requirements.txt
 
 # Set up environment variables
-cp .env.example .env
+cp env.example .env
 # Edit .env with your configuration
 ```
 
@@ -76,20 +76,20 @@ MCP_API_KEY=your_mcp_key
 Create mapping files in `config/mappings/`:
 
 ```yaml
-# config/mappings/sample_mapping.yaml
+# config/mappings/disability_mapping.yaml
 source_format: csv
 target_format: json
-record_type: customer_data
+record_type: disability
 rules:
-  - source_field: customer_id
-    target_field: customerId
+  - source_field: policy_number
+    target_field: policyId
     transformation_type: direct
     validation:
       required: true
       pattern: "^[A-Z0-9]{6,12}$"
   
-  - source_field: registration_date
-    target_field: registrationDate
+  - source_field: effective_date
+    target_field: effectiveDate
     transformation_type: date_format
     source_format: "%Y-%m-%d"
     target_format: "ISO8601"
@@ -104,42 +104,42 @@ rules:
 
 ```bash
 # Run migration with default configuration
-python main.py migrate data/input/sample_data.csv
+python main.py migrate data/input/sample_disability_data.csv
 
 # Run with custom mapping
-python main.py migrate data/input/sample_data.csv --mapping config/mappings/custom_mapping.yaml
+python main.py migrate data/input/sample_disability_data.csv --mapping config/mappings/custom_mapping.yaml
 
 # Run in dry-run mode
-python main.py migrate data/input/sample_data.csv --dry-run
+python main.py migrate data/input/sample_disability_data.csv --dry-run
 ```
 
 ### Advanced Usage
 
 ```python
-from migration_platform import MigrationPlatform
-from config import LLMConfig, MCPConfig
+from workflows.migration_graph import MigrationWorkflow
+from config.settings import LLMConfig, MCPConfig
 
 # Initialize platform
-platform = MigrationPlatform(
+workflow = MigrationWorkflow(
     llm_config=LLMConfig(provider="openai", model="gpt-4"),
     mcp_config=MCPConfig(server_url="http://localhost:3000")
 )
 
 # Run migration
-result = await platform.migrate(
-    input_file="data/input/sample_data.csv",
-    mapping_file="config/mappings/sample_mapping.yaml",
-    target_system="modern_target_system"
+result = await workflow.run(
+    file_path="data/input/sample_disability_data.csv",
+    mapping_config=mapping_config,
+    record_type="disability"
 )
 
-print(f"Migration completed: {result.success_rate}% success rate")
+print(f"Migration completed: {result['migration_summary']['success']}")
 ```
 
 ### CLI Commands
 
 ```bash
 # Validate configuration
-python main.py validate config/mappings/sample_mapping.yaml
+python main.py validate config/mappings/disability_mapping.yaml
 
 # Check platform status
 python main.py status
@@ -159,34 +159,37 @@ python main.py logs --project migration-accelerators
 ├── agents/                 # A2A agents
 │   ├── base_agent.py      # Base agent class
 │   ├── file_reader.py     # File reading agent
-│   ├── validator.py       # Validation agent
-│   ├── mapper.py          # Mapping agent
-│   ├── transformer.py     # Transformation agent
+│   ├── validation.py      # Validation agent
+│   ├── mapping.py         # Mapping agent
+│   ├── transformation.py  # Transformation agent
 │   ├── api_integration.py # API integration agent
-│   └── orchestrator.py    # Orchestration agent
+│   └── orchestration.py   # Orchestration agent
 ├── workflows/             # LangGraph workflows
-│   ├── migration_graph.py # Main migration workflow
-│   └── validation_graph.py # Validation workflow
+│   └── migration_graph.py # Main migration workflow
 ├── llm/                   # LLM provider abstractions
 │   ├── providers.py       # LLM provider factory
 │   └── prompts.py         # Prompt templates
 ├── mcp/                   # MCP integration
-│   ├── client.py          # MCP client
-│   └── tools.py           # MCP tools
+│   └── client.py          # MCP client
 ├── config/                # Configuration
 │   ├── settings.py        # Platform settings
+│   ├── mappings.py        # Mapping utilities
+│   ├── logging_config.py  # Logging configuration
 │   └── mappings/          # Field mapping files
 ├── data/                  # Sample data
+│   └── input/             # Input data files
 ├── tests/                 # Test suite
-└── main.py               # CLI entry point
+├── main.py               # CLI entry point
+├── example.py            # Usage examples
+└── requirements.txt      # Dependencies
 ```
 
 ### Adding New LLM Providers
 
 ```python
-from llm.providers import LLMProvider
+from llm.providers import BaseLLMProvider
 
-class CustomLLMProvider(LLMProvider):
+class CustomLLMProvider(BaseLLMProvider):
     def __init__(self, config):
         super().__init__(config)
     
@@ -202,7 +205,7 @@ class CustomLLMProvider(LLMProvider):
 ### Creating Custom MCP Tools
 
 ```python
-from mcp.tools import MCPTool
+from mcp.client import MCPTool
 
 class DataAPITool(MCPTool):
     def __init__(self):
@@ -230,7 +233,7 @@ pytest tests/test_agents.py
 pytest --cov=migration_platform
 
 # Run integration tests
-pytest tests/integration/
+pytest tests/test_integration.py
 ```
 
 ## 📊 Monitoring
@@ -291,3 +294,57 @@ For support and questions:
 - [ ] Integration with additional MCP servers
 - [ ] Autonomous schema discovery and mapping
 - [ ] Cross-domain migration templates
+
+## 🎯 Use Cases
+
+### Insurance Data Migration
+- **Disability Insurance**: Migrate disability policy data from mainframe to modern systems
+- **Absence Management**: Transfer absence records and leave management data
+- **Group Policies**: Handle group insurance policy migrations
+- **Claims Processing**: Migrate claims data with validation and transformation
+
+### General Data Migration
+- **Customer Data**: Migrate customer information across systems
+- **Product Catalogs**: Transfer product data with complex relationships
+- **Financial Records**: Handle sensitive financial data migrations
+- **HR Systems**: Migrate employee and organizational data
+
+## 🚀 Quick Start
+
+1. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Configure Environment**:
+   ```bash
+   cp env.example .env
+   # Edit .env with your API keys
+   ```
+
+3. **Run Sample Migration**:
+   ```bash
+   python main.py migrate data/input/sample_disability_data.csv
+   ```
+
+4. **Check Status**:
+   ```bash
+   python main.py status
+   ```
+
+5. **Run Tests**:
+   ```bash
+   python main.py test
+   ```
+
+## 📈 Performance
+
+- **Concurrent Processing**: Handles large datasets with parallel processing
+- **Memory Efficient**: Streams data to avoid memory issues
+- **Error Recovery**: Automatic retry and error handling
+- **Progress Tracking**: Real-time progress monitoring
+- **Scalable Architecture**: Designed for enterprise-scale migrations
+
+---
+
+**Migration-Accelerators** - Accelerating data migration with the power of Agentic AI 🚀

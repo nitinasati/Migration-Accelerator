@@ -1,439 +1,527 @@
 """
-LangGraph workflow for the migration process.
+LangGraph migration workflow for the Migration-Accelerators platform.
 """
 
-import asyncio
-import json
-import time
-from typing import Dict, Any, List, Optional, TypedDict, Annotated
-from dataclasses import dataclass
-
+from typing import Any, Dict, List, Optional, TypedDict, Annotated
+import operator
 from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.memory import MemorySaver
-from langchain_core.messages import HumanMessage, AIMessage
+from langgraph.prebuilt import ToolNode
+import structlog
 
-from agents.base_agent import BaseAgent, AgentRole, AgentStatus
 from agents.file_reader import FileReaderAgent
+from agents.validation import ValidationAgent
+from agents.mapping import MappingAgent
+from agents.transformation import TransformationAgent
+from agents.api_integration import APIIntegrationAgent
 from config.settings import LLMConfig, MCPConfig, FieldMappingConfig
 
 
-@dataclass
-class MigrationState:
+class MigrationState(TypedDict):
     """State for the migration workflow."""
+    
     # Input data
     file_path: str
-    mapping_config: Optional[FieldMappingConfig] = None
-    record_type: str = "unknown"
+    mapping_config: Optional[FieldMappingConfig]
+    record_type: str
+    target_system: Dict[str, Any]
     
-    # Processing data
-    records: List[Dict[str, Any]] = None
-    validation_results: List[Dict[str, Any]] = None
-    transformed_records: List[Dict[str, Any]] = None
-    api_results: List[Dict[str, Any]] = None
+    # Workflow data
+    file_data: Optional[List[Dict[str, Any]]]
+    validated_data: Optional[List[Dict[str, Any]]]
+    mapped_data: Optional[List[Dict[str, Any]]]
+    transformed_data: Optional[Any]
+    api_results: Optional[List[Dict[str, Any]]]
     
     # Workflow state
-    current_step: str = "start"
-    errors: List[str] = None
-    warnings: List[str] = None
+    current_step: str
+    completed_steps: List[str]
+    errors: List[str]
+    warnings: List[str]
+    progress: float
     
-    # Metrics
-    start_time: float = None
-    end_time: float = None
-    total_records: int = 0
-    successful_records: int = 0
-    failed_records: int = 0
+    # Agent configurations
+    llm_config: Optional[LLMConfig]
+    mcp_config: Optional[MCPConfig]
     
-    def __post_init__(self):
-        if self.records is None:
-            self.records = []
-        if self.validation_results is None:
-            self.validation_results = []
-        if self.transformed_records is None:
-            self.transformed_records = []
-        if self.api_results is None:
-            self.api_results = []
-        if self.errors is None:
-            self.errors = []
-        if self.warnings is None:
-            self.warnings = []
-        if self.start_time is None:
-            self.start_time = time.time()
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert state to dictionary."""
-        return {
-            "file_path": self.file_path,
-            "record_type": self.record_type,
-            "current_step": self.current_step,
-            "total_records": self.total_records,
-            "successful_records": self.successful_records,
-            "failed_records": self.failed_records,
-            "errors": self.errors,
-            "warnings": self.warnings,
-            "duration_seconds": self.end_time - self.start_time if self.end_time else None
-        }
+    # Results
+    final_result: Optional[Dict[str, Any]]
+    success: bool
 
 
 class MigrationWorkflow:
-    """Main migration workflow using LangGraph."""
+    """LangGraph-based migration workflow."""
     
-    def __init__(
-        self,
-        llm_config: LLMConfig,
-        mcp_config: MCPConfig,
-        agents: Optional[Dict[str, BaseAgent]] = None
-    ):
+    def __init__(self, llm_config: Optional[LLMConfig] = None, mcp_config: Optional[MCPConfig] = None):
         self.llm_config = llm_config
         self.mcp_config = mcp_config
-        self.agents = agents or {}
+        self.logger = structlog.get_logger().bind(component="migration_workflow")
         
-        # Initialize workflow graph
-        self.graph = self._create_workflow_graph()
+        # Initialize agents
+        self.file_reader = FileReaderAgent(llm_config, mcp_config)
+        self.validator = ValidationAgent(llm_config, mcp_config)
+        self.mapper = MappingAgent(llm_config, mcp_config)
+        self.transformer = TransformationAgent(llm_config, mcp_config)
+        self.api_integrator = APIIntegrationAgent(llm_config, mcp_config)
         
-        # Initialize checkpoint memory
-        self.memory = MemorySaver()
+        # Build workflow graph
+        self.graph = self._build_workflow_graph()
     
-    def _create_workflow_graph(self) -> StateGraph:
-        """Create the migration workflow graph."""
+    def _build_workflow_graph(self) -> StateGraph:
+        """Build the LangGraph workflow."""
         
         # Create state graph
         workflow = StateGraph(MigrationState)
         
         # Add nodes
-        workflow.add_node("file_reader", self._file_reader_node)
-        workflow.add_node("validator", self._validator_node)
-        workflow.add_node("mapper", self._mapper_node)
-        workflow.add_node("transformer", self._transformer_node)
-        workflow.add_node("api_integrator", self._api_integrator_node)
-        workflow.add_node("error_handler", self._error_handler_node)
+        workflow.add_node("initialize", self._initialize_workflow)
+        workflow.add_node("read_file", self._read_file_node)
+        workflow.add_node("validate_data", self._validate_data_node)
+        workflow.add_node("map_data", self._map_data_node)
+        workflow.add_node("transform_data", self._transform_data_node)
+        workflow.add_node("integrate_api", self._integrate_api_node)
+        workflow.add_node("finalize", self._finalize_workflow)
+        workflow.add_node("handle_error", self._handle_error_node)
         
         # Add edges
-        workflow.add_edge("file_reader", "validator")
-        workflow.add_edge("validator", "mapper")
-        workflow.add_edge("mapper", "transformer")
-        workflow.add_edge("transformer", "api_integrator")
-        workflow.add_edge("api_integrator", END)
+        workflow.set_entry_point("initialize")
+        
+        workflow.add_edge("initialize", "read_file")
+        workflow.add_edge("read_file", "validate_data")
+        workflow.add_edge("validate_data", "map_data")
+        workflow.add_edge("map_data", "transform_data")
+        workflow.add_edge("transform_data", "integrate_api")
+        workflow.add_edge("integrate_api", "finalize")
+        workflow.add_edge("finalize", END)
         
         # Add conditional edges for error handling
         workflow.add_conditional_edges(
-            "file_reader",
+            "read_file",
             self._should_continue,
             {
-                "continue": "validator",
-                "error": "error_handler"
+                "continue": "validate_data",
+                "error": "handle_error"
             }
         )
         
         workflow.add_conditional_edges(
-            "validator",
+            "validate_data",
             self._should_continue,
             {
-                "continue": "mapper",
-                "error": "error_handler"
+                "continue": "map_data",
+                "error": "handle_error"
             }
         )
         
         workflow.add_conditional_edges(
-            "mapper",
+            "map_data",
             self._should_continue,
             {
-                "continue": "transformer",
-                "error": "error_handler"
+                "continue": "transform_data",
+                "error": "handle_error"
             }
         )
         
         workflow.add_conditional_edges(
-            "transformer",
+            "transform_data",
             self._should_continue,
             {
-                "continue": "api_integrator",
-                "error": "error_handler"
+                "continue": "integrate_api",
+                "error": "handle_error"
             }
         )
         
         workflow.add_conditional_edges(
-            "api_integrator",
+            "integrate_api",
             self._should_continue,
             {
-                "continue": END,
-                "error": "error_handler"
+                "continue": "finalize",
+                "error": "handle_error"
             }
         )
         
-        # Set entry point
-        workflow.set_entry_point("file_reader")
+        workflow.add_edge("handle_error", END)
         
-        return workflow.compile(checkpointer=self.memory)
+        return workflow.compile()
     
-    async def _file_reader_node(self, state: MigrationState) -> MigrationState:
-        """File reader node."""
-        try:
-            state.current_step = "file_reader"
-            
-            # Get or create file reader agent
-            file_reader = self.agents.get("file_reader")
-            if not file_reader:
-                from llm.providers import LLMProviderFactory
-                from mcp.client import MCPToolManager
-                
-                llm_provider = LLMProviderFactory.create(self.llm_config)
-                mcp_manager = MCPToolManager(self.mcp_config)
-                
-                file_reader = FileReaderAgent(
-                    llm_provider=llm_provider,
-                    mcp_manager=mcp_manager
-                )
-                self.agents["file_reader"] = file_reader
-            
-            # Execute file reading
-            result = await file_reader.execute({
-                "file_path": state.file_path,
-                "record_type": state.record_type
-            })
-            
-            # Update state
-            state.records = result.get("records", [])
-            state.total_records = len(state.records)
-            state.record_type = result.get("record_type", state.record_type)
-            
-            # Add any warnings
-            if result.get("file_analysis", {}).get("issues"):
-                state.warnings.extend(result["file_analysis"]["issues"])
-            
-            return state
-            
-        except Exception as e:
-            state.errors.append(f"File reading failed: {str(e)}")
-            return state
-    
-    async def _validator_node(self, state: MigrationState) -> MigrationState:
-        """Validator node."""
-        try:
-            state.current_step = "validator"
-            
-            # Get or create validator agent
-            validator = self.agents.get("validator")
-            if not validator:
-                from agents.validator import ValidationAgent
-                from llm.providers import LLMProviderFactory
-                from mcp.client import MCPToolManager
-                
-                llm_provider = LLMProviderFactory.create(self.llm_config)
-                mcp_manager = MCPToolManager(self.mcp_config)
-                
-                validator = ValidationAgent(
-                    llm_provider=llm_provider,
-                    mcp_manager=mcp_manager
-                )
-                self.agents["validator"] = validator
-            
-            # Execute validation
-            validation_results = []
-            for record in state.records:
-                result = await validator.execute({
-                    "record": record,
-                    "record_type": state.record_type,
-                    "validation_rules": state.mapping_config.rules if state.mapping_config else []
-                })
-                validation_results.append(result)
-            
-            # Update state
-            state.validation_results = validation_results
-            
-            # Count successful/failed records
-            for result in validation_results:
-                if result.get("is_valid", False):
-                    state.successful_records += 1
-                else:
-                    state.failed_records += 1
-                    if result.get("errors"):
-                        state.errors.extend(result["errors"])
-            
-            return state
-            
-        except Exception as e:
-            state.errors.append(f"Validation failed: {str(e)}")
-            return state
-    
-    async def _mapper_node(self, state: MigrationState) -> MigrationState:
-        """Mapper node."""
-        try:
-            state.current_step = "mapper"
-            
-            # Get or create mapper agent
-            mapper = self.agents.get("mapper")
-            if not mapper:
-                from agents.mapper import MappingAgent
-                from llm.providers import LLMProviderFactory
-                from mcp.client import MCPToolManager
-                
-                llm_provider = LLMProviderFactory.create(self.llm_config)
-                mcp_manager = MCPToolManager(self.mcp_config)
-                
-                mapper = MappingAgent(
-                    llm_provider=llm_provider,
-                    mcp_manager=mcp_manager
-                )
-                self.agents["mapper"] = mapper
-            
-            # Execute mapping
-            result = await mapper.execute({
-                "records": state.records,
-                "mapping_config": state.mapping_config,
-                "record_type": state.record_type
-            })
-            
-            # Update state
-            state.mapping_config = result.get("mapping_config", state.mapping_config)
-            
-            return state
-            
-        except Exception as e:
-            state.errors.append(f"Mapping failed: {str(e)}")
-            return state
-    
-    async def _transformer_node(self, state: MigrationState) -> MigrationState:
-        """Transformer node."""
-        try:
-            state.current_step = "transformer"
-            
-            # Get or create transformer agent
-            transformer = self.agents.get("transformer")
-            if not transformer:
-                from agents.transformer import TransformationAgent
-                from llm.providers import LLMProviderFactory
-                from mcp.client import MCPToolManager
-                
-                llm_provider = LLMProviderFactory.create(self.llm_config)
-                mcp_manager = MCPToolManager(self.mcp_config)
-                
-                transformer = TransformationAgent(
-                    llm_provider=llm_provider,
-                    mcp_manager=mcp_manager
-                )
-                self.agents["transformer"] = transformer
-            
-            # Execute transformation
-            transformed_records = []
-            for record in state.records:
-                result = await transformer.execute({
-                    "record": record,
-                    "mapping_config": state.mapping_config,
-                    "record_type": state.record_type
-                })
-                transformed_records.append(result.get("transformed_record", record))
-            
-            # Update state
-            state.transformed_records = transformed_records
-            
-            return state
-            
-        except Exception as e:
-            state.errors.append(f"Transformation failed: {str(e)}")
-            return state
-    
-    async def _api_integrator_node(self, state: MigrationState) -> MigrationState:
-        """API integrator node."""
-        try:
-            state.current_step = "api_integrator"
-            
-            # Get or create API integrator agent
-            api_integrator = self.agents.get("api_integrator")
-            if not api_integrator:
-                from agents.api_integrator import APIIntegrationAgent
-                from llm.providers import LLMProviderFactory
-                from mcp.client import MCPToolManager
-                
-                llm_provider = LLMProviderFactory.create(self.llm_config)
-                mcp_manager = MCPToolManager(self.mcp_config)
-                
-                api_integrator = APIIntegrationAgent(
-                    llm_provider=llm_provider,
-                    mcp_manager=mcp_manager
-                )
-                self.agents["api_integrator"] = api_integrator
-            
-            # Execute API integration
-            api_results = []
-            for record in state.transformed_records:
-                result = await api_integrator.execute({
-                    "record": record,
-                    "record_type": state.record_type,
-                    "operation": "create"
-                })
-                api_results.append(result)
-            
-            # Update state
-            state.api_results = api_results
-            state.end_time = time.time()
-            
-            return state
-            
-        except Exception as e:
-            state.errors.append(f"API integration failed: {str(e)}")
-            return state
-    
-    async def _error_handler_node(self, state: MigrationState) -> MigrationState:
-        """Error handler node."""
-        state.current_step = "error_handler"
-        state.end_time = time.time()
+    async def _initialize_workflow(self, state: MigrationState) -> MigrationState:
+        """Initialize the workflow."""
+        self.logger.info("Initializing migration workflow")
         
-        # Log errors
-        for error in state.errors:
-            print(f"ERROR: {error}")
+        # Initialize agents
+        await self.file_reader.initialize()
+        await self.validator.initialize()
+        await self.mapper.initialize()
+        await self.transformer.initialize()
+        await self.api_integrator.initialize()
+        
+        # Update state
+        state["current_step"] = "initialization"
+        state["completed_steps"] = []
+        state["errors"] = []
+        state["warnings"] = []
+        state["progress"] = 0.0
+        state["success"] = False
+        
+        self.logger.info("Workflow initialized")
+        return state
+    
+    async def _read_file_node(self, state: MigrationState) -> MigrationState:
+        """Read file node."""
+        try:
+            self.logger.info("Reading file", file_path=state["file_path"])
+            
+            # Prepare context
+            context = {
+                "file_format": state.get("file_format"),
+                "encoding": state.get("encoding"),
+                "delimiter": state.get("delimiter")
+            }
+            
+            # Read file
+            result = await self.file_reader.process(state["file_path"], context)
+            
+            if result.success:
+                state["file_data"] = result.data
+                state["completed_steps"].append("read_file")
+                state["progress"] = 20.0
+                state["current_step"] = "file_read"
+                
+                self.logger.info("File read successfully", records_count=len(result.data) if isinstance(result.data, list) else 1)
+            else:
+                state["errors"].extend(result.errors)
+                state["current_step"] = "file_read_error"
+                
+                self.logger.error("File reading failed", errors=result.errors)
+            
+            return state
+            
+        except Exception as e:
+            self.logger.error("Error in read file node", error=str(e))
+            state["errors"].append(f"File reading error: {str(e)}")
+            state["current_step"] = "file_read_error"
+            return state
+    
+    async def _validate_data_node(self, state: MigrationState) -> MigrationState:
+        """Validate data node."""
+        try:
+            self.logger.info("Validating data")
+            
+            if not state["file_data"]:
+                state["errors"].append("No file data to validate")
+                state["current_step"] = "validation_error"
+                return state
+            
+            # Prepare validation context
+            validation_context = {
+                "record_type": state["record_type"],
+                "validation_rules": state["mapping_config"].rules if state["mapping_config"] else [],
+                "schema": None
+            }
+            
+            # Validate data
+            result = await self.validator.process(state["file_data"], validation_context)
+            
+            if result.success:
+                state["validated_data"] = result.data
+                state["completed_steps"].append("validate_data")
+                state["progress"] = 40.0
+                state["current_step"] = "data_validated"
+                
+                if result.warnings:
+                    state["warnings"].extend(result.warnings)
+                
+                self.logger.info("Data validation successful")
+            else:
+                state["errors"].extend(result.errors)
+                state["current_step"] = "validation_error"
+                
+                self.logger.error("Data validation failed", errors=result.errors)
+            
+            return state
+            
+        except Exception as e:
+            self.logger.error("Error in validate data node", error=str(e))
+            state["errors"].append(f"Data validation error: {str(e)}")
+            state["current_step"] = "validation_error"
+            return state
+    
+    async def _map_data_node(self, state: MigrationState) -> MigrationState:
+        """Map data node."""
+        try:
+            self.logger.info("Mapping data")
+            
+            if not state["validated_data"]:
+                state["errors"].append("No validated data to map")
+                state["current_step"] = "mapping_error"
+                return state
+            
+            if not state["mapping_config"]:
+                state["errors"].append("No mapping configuration provided")
+                state["current_step"] = "mapping_error"
+                return state
+            
+            # Prepare mapping context
+            mapping_context = {
+                "mapping_rules": state["mapping_config"].rules,
+                "record_type": state["record_type"]
+            }
+            
+            # Map data
+            result = await self.mapper.process(state["validated_data"], mapping_context)
+            
+            if result.success:
+                state["mapped_data"] = result.data
+                state["completed_steps"].append("map_data")
+                state["progress"] = 60.0
+                state["current_step"] = "data_mapped"
+                
+                if result.warnings:
+                    state["warnings"].extend(result.warnings)
+                
+                self.logger.info("Data mapping successful")
+            else:
+                state["errors"].extend(result.errors)
+                state["current_step"] = "mapping_error"
+                
+                self.logger.error("Data mapping failed", errors=result.errors)
+            
+            return state
+            
+        except Exception as e:
+            self.logger.error("Error in map data node", error=str(e))
+            state["errors"].append(f"Data mapping error: {str(e)}")
+            state["current_step"] = "mapping_error"
+            return state
+    
+    async def _transform_data_node(self, state: MigrationState) -> MigrationState:
+        """Transform data node."""
+        try:
+            self.logger.info("Transforming data")
+            
+            if not state["mapped_data"]:
+                state["errors"].append("No mapped data to transform")
+                state["current_step"] = "transformation_error"
+                return state
+            
+            if not state["mapping_config"]:
+                state["errors"].append("No mapping configuration for transformation")
+                state["current_step"] = "transformation_error"
+                return state
+            
+            # Prepare transformation context
+            transformation_context = {
+                "source_format": state["mapping_config"].source_format,
+                "target_format": state["mapping_config"].target_format,
+                "target_schema": None
+            }
+            
+            # Transform data
+            result = await self.transformer.process(state["mapped_data"], transformation_context)
+            
+            if result.success:
+                state["transformed_data"] = result.data
+                state["completed_steps"].append("transform_data")
+                state["progress"] = 80.0
+                state["current_step"] = "data_transformed"
+                
+                if result.warnings:
+                    state["warnings"].extend(result.warnings)
+                
+                self.logger.info("Data transformation successful")
+            else:
+                state["errors"].extend(result.errors)
+                state["current_step"] = "transformation_error"
+                
+                self.logger.error("Data transformation failed", errors=result.errors)
+            
+            return state
+            
+        except Exception as e:
+            self.logger.error("Error in transform data node", error=str(e))
+            state["errors"].append(f"Data transformation error: {str(e)}")
+            state["current_step"] = "transformation_error"
+            return state
+    
+    async def _integrate_api_node(self, state: MigrationState) -> MigrationState:
+        """Integrate with API node."""
+        try:
+            self.logger.info("Integrating with target system")
+            
+            if not state["transformed_data"]:
+                state["errors"].append("No transformed data for API integration")
+                state["current_step"] = "api_integration_error"
+                return state
+            
+            # Prepare API context
+            api_context = {
+                "endpoint": state["target_system"].get("endpoint", "disability_policy"),
+                "base_url": state["target_system"].get("base_url", "https://api.insurance-system.com"),
+                "authentication": state["target_system"].get("authentication", {}),
+                "batch_size": state["target_system"].get("batch_size", 10)
+            }
+            
+            # Integrate with API
+            result = await self.api_integrator.process(state["transformed_data"], api_context)
+            
+            if result.success:
+                state["api_results"] = result.data
+                state["completed_steps"].append("integrate_api")
+                state["progress"] = 100.0
+                state["current_step"] = "api_integrated"
+                
+                if result.warnings:
+                    state["warnings"].extend(result.warnings)
+                
+                self.logger.info("API integration successful")
+            else:
+                state["errors"].extend(result.errors)
+                state["current_step"] = "api_integration_error"
+                
+                self.logger.error("API integration failed", errors=result.errors)
+            
+            return state
+            
+        except Exception as e:
+            self.logger.error("Error in integrate API node", error=str(e))
+            state["errors"].append(f"API integration error: {str(e)}")
+            state["current_step"] = "api_integration_error"
+            return state
+    
+    async def _finalize_workflow(self, state: MigrationState) -> MigrationState:
+        """Finalize the workflow."""
+        try:
+            self.logger.info("Finalizing migration workflow")
+            
+            # Create final result
+            final_result = {
+                "migration_summary": {
+                    "total_records_processed": len(state["file_data"]) if state["file_data"] else 0,
+                    "completed_steps": state["completed_steps"],
+                    "progress": state["progress"],
+                    "success": len(state["errors"]) == 0
+                },
+                "data_pipeline": {
+                    "file_data": state["file_data"],
+                    "validated_data": state["validated_data"],
+                    "mapped_data": state["mapped_data"],
+                    "transformed_data": state["transformed_data"],
+                    "api_results": state["api_results"]
+                },
+                "errors": state["errors"],
+                "warnings": state["warnings"]
+            }
+            
+            state["final_result"] = final_result
+            state["success"] = len(state["errors"]) == 0
+            state["current_step"] = "completed"
+            
+            self.logger.info("Migration workflow finalized", success=state["success"])
+            
+            return state
+            
+        except Exception as e:
+            self.logger.error("Error in finalize workflow", error=str(e))
+            state["errors"].append(f"Workflow finalization error: {str(e)}")
+            state["success"] = False
+            return state
+    
+    async def _handle_error_node(self, state: MigrationState) -> MigrationState:
+        """Handle error node."""
+        self.logger.error("Handling workflow error", errors=state["errors"])
+        
+        # Create error result
+        error_result = {
+            "migration_summary": {
+                "total_records_processed": len(state["file_data"]) if state["file_data"] else 0,
+                "completed_steps": state["completed_steps"],
+                "progress": state["progress"],
+                "success": False,
+                "failed_step": state["current_step"]
+            },
+            "errors": state["errors"],
+            "warnings": state["warnings"]
+        }
+        
+        state["final_result"] = error_result
+        state["success"] = False
+        state["current_step"] = "error"
         
         return state
     
     def _should_continue(self, state: MigrationState) -> str:
-        """Determine if workflow should continue or handle errors."""
-        if state.errors:
+        """Determine if workflow should continue or handle error."""
+        if state["errors"]:
             return "error"
-        return "continue"
+        else:
+            return "continue"
     
-    async def run(self, file_path: str, mapping_config: Optional[FieldMappingConfig] = None, record_type: str = "unknown") -> Dict[str, Any]:
-        """Run the migration workflow."""
+    async def run(
+        self,
+        file_path: str,
+        mapping_config: FieldMappingConfig,
+        record_type: str = "disability",
+        target_system: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Run the migration workflow.
         
-        # Create initial state
-        initial_state = MigrationState(
-            file_path=file_path,
-            mapping_config=mapping_config,
-            record_type=record_type
-        )
-        
-        # Run the workflow
+        Args:
+            file_path: Path to the input file
+            mapping_config: Field mapping configuration
+            record_type: Type of records to process
+            target_system: Target system configuration
+            
+        Returns:
+            Dict[str, Any]: Migration result
+        """
         try:
+            self.logger.info("Starting migration workflow", file_path=file_path, record_type=record_type)
+            
+            # Prepare initial state
+            initial_state: MigrationState = {
+                "file_path": file_path,
+                "mapping_config": mapping_config,
+                "record_type": record_type,
+                "target_system": target_system or {},
+                "file_data": None,
+                "validated_data": None,
+                "mapped_data": None,
+                "transformed_data": None,
+                "api_results": None,
+                "current_step": "initialization",
+                "completed_steps": [],
+                "errors": [],
+                "warnings": [],
+                "progress": 0.0,
+                "llm_config": self.llm_config,
+                "mcp_config": self.mcp_config,
+                "final_result": None,
+                "success": False
+            }
+            
+            # Run workflow
             final_state = await self.graph.ainvoke(initial_state)
             
-            # Return results
-            return {
-                "success": len(final_state.errors) == 0,
-                "state": final_state.to_dict(),
-                "summary": {
-                    "total_records": final_state.total_records,
-                    "successful_records": final_state.successful_records,
-                    "failed_records": final_state.failed_records,
-                    "success_rate": final_state.successful_records / final_state.total_records if final_state.total_records > 0 else 0,
-                    "duration_seconds": final_state.end_time - final_state.start_time if final_state.end_time else None,
-                    "errors": final_state.errors,
-                    "warnings": final_state.warnings
-                }
-            }
+            self.logger.info("Migration workflow completed", success=final_state["success"])
+            
+            return final_state["final_result"]
             
         except Exception as e:
+            self.logger.error("Migration workflow failed", error=str(e))
             return {
-                "success": False,
-                "error": str(e),
-                "state": initial_state.to_dict()
+                "migration_summary": {
+                    "success": False,
+                    "error": str(e)
+                },
+                "errors": [str(e)]
             }
     
-    async def get_agent_status(self) -> Dict[str, Any]:
-        """Get status of all agents."""
-        status = {}
-        for name, agent in self.agents.items():
-            status[name] = agent.get_status()
-        return status
-    
-    async def cleanup(self):
-        """Cleanup resources."""
-        for agent in self.agents.values():
-            await agent.cleanup()
+    async def close(self) -> None:
+        """Close the workflow and all agents."""
+        await self.file_reader.close()
+        await self.validator.close()
+        await self.mapper.close()
+        await self.transformer.close()
+        await self.api_integrator.close()
+        
+        self.logger.info("Migration workflow closed")

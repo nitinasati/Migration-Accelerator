@@ -26,12 +26,12 @@ class FileFormat(str, Enum):
 
 
 class RecordType(str, Enum):
-    """Data record types."""
-    CUSTOMER_DATA = "customer_data"
-    PRODUCT_DATA = "product_data"
-    TRANSACTION_DATA = "transaction_data"
-    USER_DATA = "user_data"
-    INVENTORY_DATA = "inventory_data"
+    """Insurance record types."""
+    DISABILITY = "disability"
+    ABSENCE = "absence"
+    GROUP_POLICY = "group_policy"
+    EMPLOYEE = "employee"
+    CLAIM = "claim"
 
 
 class TransformationType(str, Enum):
@@ -98,7 +98,6 @@ class FieldMappingRule(BaseModel):
     source_format: Optional[str] = Field(None, description="Source format (for dates)")
     target_format: Optional[str] = Field(None, description="Target format (for dates)")
     lookup_table: Optional[Dict[str, str]] = Field(None, description="Lookup table")
-    default_value: Optional[Any] = Field(None, description="Default value")
     calculation_formula: Optional[str] = Field(None, description="Calculation formula")
     condition: Optional[str] = Field(None, description="Conditional logic")
 
@@ -108,103 +107,83 @@ class FieldMappingConfig(BaseModel):
     source_format: FileFormat = Field(..., description="Source file format")
     target_format: FileFormat = Field(..., description="Target file format")
     record_type: RecordType = Field(..., description="Record type")
-    rules: List[FieldMappingRule] = Field(..., description="Mapping rules")
     version: str = Field(default="1.0", description="Mapping version")
-    description: Optional[str] = Field(None, description="Mapping description")
+    description: str = Field(default="", description="Mapping description")
+    rules: List[FieldMappingRule] = Field(default_factory=list, description="Mapping rules")
 
 
-class MigrationConfig(BaseModel):
-    """Migration configuration."""
-    migration_id: str = Field(..., description="Unique migration ID")
-    batch_size: int = Field(default=1000, description="Batch size for processing")
-    max_errors: int = Field(default=100, description="Maximum allowed errors")
-    allow_partial_migration: bool = Field(default=False, description="Allow partial migration")
-    strict_validation: bool = Field(default=True, description="Strict validation mode")
-    dry_run: bool = Field(default=False, description="Dry run mode")
-    target_system: str = Field(..., description="Target system identifier")
-
-
-class PlatformSettings(BaseSettings):
-    """Main platform settings."""
+class MigrationSettings(BaseSettings):
+    """Main application settings."""
     
     # LLM Configuration
-    llm_provider: LLMProvider = Field(default=LLMProvider.OPENAI, env="LLM_PROVIDER")
-    llm_model: str = Field(default="gpt-4", env="LLM_MODEL")
-    llm_temperature: float = Field(default=0.1, env="LLM_TEMPERATURE")
-    llm_max_tokens: int = Field(default=4000, env="LLM_MAX_TOKENS")
+    llm_provider: LLMProvider = Field(default=LLMProvider.OPENAI, description="Default LLM provider")
+    llm_model: str = Field(default="gpt-4", description="Default LLM model")
+    llm_temperature: float = Field(default=0.1, description="Default LLM temperature")
+    llm_max_tokens: int = Field(default=4000, description="Default max tokens")
     
     # API Keys
-    openai_api_key: Optional[str] = Field(None, env="OPENAI_API_KEY")
-    anthropic_api_key: Optional[str] = Field(None, env="ANTHROPIC_API_KEY")
-    aws_access_key_id: Optional[str] = Field(None, env="AWS_ACCESS_KEY_ID")
-    aws_secret_access_key: Optional[str] = Field(None, env="AWS_SECRET_ACCESS_KEY")
-    aws_region: str = Field(default="us-east-1", env="AWS_REGION")
+    openai_api_key: Optional[str] = Field(None, description="OpenAI API key")
+    anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key")
+    aws_access_key_id: Optional[str] = Field(None, description="AWS access key ID")
+    aws_secret_access_key: Optional[str] = Field(None, description="AWS secret access key")
+    aws_region: str = Field(default="us-east-1", description="AWS region")
     
     # LangSmith Configuration
-    langchain_api_key: Optional[str] = Field(None, env="LANGCHAIN_API_KEY")
-    langchain_project: str = Field(default="insurance-migration", env="LANGCHAIN_PROJECT")
-    langchain_tracing_v2: bool = Field(default=True, env="LANGCHAIN_TRACING_V2")
-    langchain_endpoint: Optional[str] = Field(None, env="LANGCHAIN_ENDPOINT")
+    langsmith_api_key: Optional[str] = Field(None, description="LangSmith API key")
+    langsmith_project: str = Field(default="migration-accelerators", description="LangSmith project")
+    langsmith_tracing_v2: bool = Field(default=True, description="Enable LangSmith tracing")
     
     # MCP Configuration
-    mcp_server_url: str = Field(default="http://localhost:3000", env="MCP_SERVER_URL")
-    mcp_api_key: Optional[str] = Field(None, env="MCP_API_KEY")
-    mcp_timeout: int = Field(default=30, env="MCP_TIMEOUT")
-    mcp_max_retries: int = Field(default=3, env="MCP_MAX_RETRIES")
+    mcp_server_url: str = Field(default="http://localhost:3000", description="MCP server URL")
+    mcp_api_key: Optional[str] = Field(None, description="MCP API key")
+    mcp_timeout: int = Field(default=30, description="MCP timeout")
+    mcp_max_retries: int = Field(default=3, description="MCP max retries")
     
     # File Processing
-    input_dir: str = Field(default="data/input", env="INPUT_DIR")
-    output_dir: str = Field(default="data/output", env="OUTPUT_DIR")
-    temp_dir: str = Field(default="data/temp", env="TEMP_DIR")
+    max_file_size_mb: int = Field(default=100, description="Maximum file size in MB")
+    chunk_size: int = Field(default=1000, description="Processing chunk size")
+    temp_directory: str = Field(default="./temp", description="Temporary directory")
     
     # Logging
-    log_level: str = Field(default="INFO", env="LOG_LEVEL")
-    log_file: str = Field(default="logs/migration.log", env="LOG_FILE")
-    
-    # Processing
-    batch_size: int = Field(default=1000, env="BATCH_SIZE")
-    max_errors: int = Field(default=100, env="MAX_ERRORS")
-    timeout: int = Field(default=300, env="TIMEOUT")
+    log_level: str = Field(default="INFO", description="Log level")
+    log_format: str = Field(default="json", description="Log format")
     
     class Config:
         env_file = ".env"
+        env_file_encoding = "utf-8"
         case_sensitive = False
-    
-    def get_llm_config(self) -> LLMConfig:
-        """Get LLM configuration."""
-        api_key = None
-        if self.llm_provider == LLMProvider.OPENAI:
-            api_key = self.openai_api_key
-        elif self.llm_provider == LLMProvider.ANTHROPIC:
-            api_key = self.anthropic_api_key
-        
-        return LLMConfig(
-            provider=self.llm_provider,
-            model=self.llm_model,
-            temperature=self.llm_temperature,
-            max_tokens=self.llm_max_tokens,
-            api_key=api_key,
-            region=self.aws_region
-        )
-    
-    def get_mcp_config(self) -> MCPConfig:
-        """Get MCP configuration."""
-        return MCPConfig(
-            server_url=self.mcp_server_url,
-            api_key=self.mcp_api_key,
-            timeout=self.mcp_timeout,
-            max_retries=self.mcp_max_retries
-        )
-    
-    def get_langsmith_config(self) -> LangSmithConfig:
-        """Get LangSmith configuration."""
-        return LangSmithConfig(
-            api_key=self.langchain_api_key,
-            project=self.langchain_project,
-            tracing_v2=self.langchain_tracing_v2,
-            endpoint=self.langchain_endpoint
-        )
 
 
 # Global settings instance
-settings = PlatformSettings()
+settings = MigrationSettings()
+
+
+def get_llm_config() -> LLMConfig:
+    """Get LLM configuration from settings."""
+    return LLMConfig(
+        provider=settings.llm_provider,
+        model=settings.llm_model,
+        temperature=settings.llm_temperature,
+        max_tokens=settings.llm_max_tokens,
+        api_key=getattr(settings, f"{settings.llm_provider.value}_api_key", None),
+        region=settings.aws_region if settings.llm_provider == LLMProvider.BEDROCK else None
+    )
+
+
+def get_mcp_config() -> MCPConfig:
+    """Get MCP configuration from settings."""
+    return MCPConfig(
+        server_url=settings.mcp_server_url,
+        api_key=settings.mcp_api_key,
+        timeout=settings.mcp_timeout,
+        max_retries=settings.mcp_max_retries
+    )
+
+
+def get_langsmith_config() -> LangSmithConfig:
+    """Get LangSmith configuration from settings."""
+    return LangSmithConfig(
+        api_key=settings.langsmith_api_key,
+        project=settings.langsmith_project,
+        tracing_v2=settings.langsmith_tracing_v2
+    )

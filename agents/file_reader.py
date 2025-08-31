@@ -1,38 +1,40 @@
 """
-File Reader Agent for reading mainframe files.
+File Reader Agent for the Migration-Accelerators platform.
 """
 
-import os
-import pandas as pd
+import csv
 import json
-from typing import Dict, Any, List, Optional
+import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+import pandas as pd
+import structlog
 
-from agents.base_agent import BaseAgent, AgentRole
-from llm.providers import LLMProviderBase
-from mcp.client import MCPToolManager
-from config.settings import FileFormat
+from .base_agent import BaseAgent, AgentResult
+from config.settings import LLMConfig, MCPConfig, FileFormat
+from llm.providers import BaseLLMProvider, LLMProviderFactory
+from llm.prompts import get_prompt, get_system_prompt
 
 
 class FileReaderAgent(BaseAgent):
-    """Agent responsible for reading and parsing mainframe files."""
+    """
+    File Reader Agent for processing mainframe and legacy system files.
+    
+    This agent handles:
+    - Automatic file format detection
+    - Parsing various file formats (CSV, Excel, XML, JSON, Fixed-width)
+    - Encoding detection and handling
+    - Data extraction and validation
+    - Metadata collection
+    """
     
     def __init__(
         self,
-        name: str = "FileReaderAgent",
-        llm_provider: Optional[LLMProviderBase] = None,
-        mcp_manager: Optional[MCPToolManager] = None,
-        config: Optional[Dict[str, Any]] = None
+        llm_config: Optional[LLMConfig] = None,
+        mcp_config: Optional[MCPConfig] = None
     ):
-        super().__init__(
-            name=name,
-            role=AgentRole.FILE_READER,
-            llm_provider=llm_provider,
-            mcp_manager=mcp_manager,
-            config=config
-        )
-        
-        # Supported file formats
+        super().__init__("file_reader", llm_config, mcp_config)
+        self.llm_provider: Optional[BaseLLMProvider] = None
         self.supported_formats = {
             FileFormat.CSV: self._read_csv,
             FileFormat.EXCEL: self._read_excel,
@@ -41,297 +43,503 @@ class FileReaderAgent(BaseAgent):
             FileFormat.FIXED_WIDTH: self._read_fixed_width
         }
     
-    async def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process file reading request."""
-        file_path = input_data.get("file_path")
-        file_format = input_data.get("file_format")
-        record_type = input_data.get("record_type", "unknown")
+    async def initialize(self) -> None:
+        """Initialize the file reader agent."""
+        await super().start()
         
-        if not file_path or not os.path.exists(file_path):
-            raise FileNotFoundError(f"File not found: {file_path}")
+        if self.llm_config:
+            self.llm_provider = LLMProviderFactory.create(self.llm_config, self.agent_name)
+            await self.llm_provider.initialize()
+            self.logger.info("LLM provider initialized for file reader")
         
-        self.logger.info("Starting file reading", file_path=file_path, format=file_format)
-        
-        # Detect file format if not provided
-        if not file_format:
-            file_format = self._detect_file_format(file_path)
-        
-        # Read the file
-        records = await self._read_file(file_path, file_format)
-        
-        # Enhance with LLM if available
-        if self.llm_provider:
-            enhanced_records = await self._enhance_records(records, record_type)
-        else:
-            enhanced_records = records
-        
-        # Update metrics
-        self.metrics.records_processed = len(enhanced_records)
-        
-        result = {
-            "file_path": file_path,
-            "file_format": file_format,
-            "record_type": record_type,
-            "total_records": len(enhanced_records),
-            "records": enhanced_records,
-            "file_analysis": await self._analyze_file(enhanced_records, file_format),
-            "enhanced": self.llm_provider is not None
-        }
-        
-        self.logger.info(
-            "File reading completed",
-            total_records=len(enhanced_records),
-            file_format=file_format
-        )
-        
-        return result
+        self.logger.info("File reader agent initialized")
     
-    def _detect_file_format(self, file_path: str) -> str:
-        """Detect file format based on extension and content."""
-        path = Path(file_path)
-        extension = path.suffix.lower()
+    async def process(self, data: Any, context: Optional[Dict[str, Any]] = None) -> AgentResult:
+        """
+        Process file reading request.
         
-        # Extension-based detection
-        if extension == '.csv':
-            return FileFormat.CSV
-        elif extension in ['.xlsx', '.xls']:
-            return FileFormat.EXCEL
-        elif extension == '.json':
-            return FileFormat.JSON
-        elif extension == '.xml':
-            return FileFormat.XML
-        elif extension in ['.txt', '.dat']:
-            # Try to detect fixed-width format
-            return FileFormat.FIXED_WIDTH
-        
-        # Content-based detection
+        Args:
+            data: File path or file data
+            context: Additional context (file format, encoding, etc.)
+            
+        Returns:
+            AgentResult: Processing result with file data
+        """
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                first_line = f.readline().strip()
-                
-                if first_line.startswith('{') or first_line.startswith('['):
-                    return FileFormat.JSON
-                elif first_line.startswith('<'):
-                    return FileFormat.XML
-                elif ',' in first_line:
-                    return FileFormat.CSV
-                else:
-                    return FileFormat.FIXED_WIDTH
-        except Exception:
-            return FileFormat.CSV  # Default fallback
-    
-    async def _read_file(self, file_path: str, file_format: str) -> List[Dict[str, Any]]:
-        """Read file based on format."""
-        if file_format not in self.supported_formats:
-            raise ValueError(f"Unsupported file format: {file_format}")
-        
-        reader_func = self.supported_formats[file_format]
-        return await reader_func(file_path)
-    
-    async def _read_csv(self, file_path: str) -> List[Dict[str, Any]]:
-        """Read CSV file."""
-        try:
-            df = pd.read_csv(file_path, encoding='utf-8')
-            return df.to_dict('records')
-        except UnicodeDecodeError:
-            # Try with different encoding
-            df = pd.read_csv(file_path, encoding='latin-1')
-            return df.to_dict('records')
-    
-    async def _read_excel(self, file_path: str) -> List[Dict[str, Any]]:
-        """Read Excel file."""
-        df = pd.read_excel(file_path)
-        return df.to_dict('records')
-    
-    async def _read_json(self, file_path: str) -> List[Dict[str, Any]]:
-        """Read JSON file."""
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        # Handle both array and object formats
-        if isinstance(data, list):
-            return data
-        elif isinstance(data, dict):
-            return [data]
-        else:
-            raise ValueError("Invalid JSON format")
-    
-    async def _read_xml(self, file_path: str) -> List[Dict[str, Any]]:
-        """Read XML file."""
-        import xml.etree.ElementTree as ET
-        
-        tree = ET.parse(file_path)
-        root = tree.getroot()
-        
-        # Convert XML to list of dictionaries
-        records = []
-        for child in root:
-            record = {}
-            for elem in child.iter():
-                if elem != child:  # Skip the root element
-                    record[elem.tag] = elem.text
-            if record:
-                records.append(record)
-        
-        return records
-    
-    async def _read_fixed_width(self, file_path: str) -> List[Dict[str, Any]]:
-        """Read fixed-width file."""
-        records = []
-        
-        with open(file_path, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-        
-        if not lines:
-            return records
-        
-        # Try to detect field widths from the first few lines
-        field_widths = self._detect_field_widths(lines[:10])
-        
-        for line in lines:
-            line = line.rstrip('\n')
-            if not line.strip():
-                continue
+            self.logger.info("Starting file reading process", data_type=type(data).__name__)
             
-            record = {}
-            start_pos = 0
+            # Validate input
+            if not await self.validate_input(data):
+                return AgentResult(
+                    success=False,
+                    errors=["Invalid input data for file reading"]
+                )
             
-            for i, width in enumerate(field_widths):
-                field_name = f"field_{i+1}"
-                field_value = line[start_pos:start_pos + width].strip()
-                record[field_name] = field_value
-                start_pos += width
+            # Determine if data is file path or file content
+            if isinstance(data, str) and Path(data).exists():
+                file_path = data
+                file_data = None
+            else:
+                file_path = context.get("file_path") if context else None
+                file_data = data
             
-            records.append(record)
-        
-        return records
-    
-    def _detect_field_widths(self, lines: List[str]) -> List[int]:
-        """Detect field widths in fixed-width files."""
-        if not lines:
-            return []
-        
-        # Simple heuristic: look for consistent spacing patterns
-        max_length = max(len(line) for line in lines)
-        
-        # Try common field widths
-        common_widths = [10, 15, 20, 25, 30]
-        
-        for width in common_widths:
-            if max_length % width == 0:
-                return [width] * (max_length // width)
-        
-        # Fallback: assume equal-width fields
-        num_fields = 10  # Default assumption
-        field_width = max_length // num_fields
-        return [field_width] * num_fields
-    
-    async def _enhance_records(self, records: List[Dict[str, Any]], record_type: str) -> List[Dict[str, Any]]:
-        """Enhance records using LLM."""
-        if not self.llm_provider or not records:
-            return records
-        
-        enhanced_records = []
-        
-        # Process records in batches
-        batch_size = self.config.get("batch_size", 10)
-        
-        for i in range(0, len(records), batch_size):
-            batch = records[i:i + batch_size]
+            # Detect file format if not provided
+            file_format = context.get("file_format") if context else None
+            if not file_format:
+                file_format = await self._detect_file_format(file_path, file_data)
             
-            # Create enhancement prompt
-            prompt = f"""
-You are an expert in analyzing {record_type} insurance data. Enhance the following records by:
-1. Identifying missing fields and suggesting default values
-2. Validating data consistency
-3. Adding derived fields where appropriate
-4. Flagging potential data quality issues
-
-Records to enhance:
-{json.dumps(batch, indent=2)}
-
-Please provide enhanced records in JSON format, maintaining the original structure while adding:
-- "_enhanced" field with enhancement details
-- "_quality_score" field (0-1)
-- "_issues" field with any data quality issues found
-"""
+            # Read file based on format
+            if file_format in self.supported_formats:
+                reader_func = self.supported_formats[file_format]
+                result = await reader_func(file_path, file_data, context)
+            else:
+                return AgentResult(
+                    success=False,
+                    errors=[f"Unsupported file format: {file_format}"]
+                )
             
-            try:
-                response = await self.llm_provider.generate(prompt)
-                self.metrics.llm_calls += 1
-                
-                # Parse enhanced records
-                import re
-                json_match = re.search(r'\[.*\]', response, re.DOTALL)
-                if json_match:
-                    enhanced_batch = json.loads(json_match.group())
-                    enhanced_records.extend(enhanced_batch)
-                else:
-                    # Fallback to original records
-                    enhanced_records.extend(batch)
-                    
-            except Exception as e:
-                self.logger.warning("LLM enhancement failed", error=str(e))
-                enhanced_records.extend(batch)
-        
-        return enhanced_records
-    
-    async def _analyze_file(self, records: List[Dict[str, Any]], file_format: str) -> Dict[str, Any]:
-        """Analyze file content and provide insights."""
-        if not records:
-            return {"error": "No records to analyze"}
-        
-        analysis = {
-            "file_format": file_format,
-            "record_count": len(records),
-            "field_names": list(records[0].keys()) if records else [],
-            "data_quality_score": 0.0,
-            "issues": [],
-            "recommendations": []
-        }
-        
-        # Basic data quality analysis
-        if records:
-            # Check for missing values
-            missing_values = {}
-            for field in analysis["field_names"]:
-                missing_count = sum(1 for record in records if not record.get(field))
-                if missing_count > 0:
-                    missing_values[field] = missing_count
+            # Add metadata
+            result.metadata.update({
+                "file_format": file_format.value if hasattr(file_format, 'value') else str(file_format),
+                "file_path": file_path,
+                "agent": self.agent_name
+            })
             
-            if missing_values:
-                analysis["issues"].append(f"Missing values found: {missing_values}")
-            
-            # Calculate quality score
-            total_fields = len(analysis["field_names"]) * len(records)
-            filled_fields = sum(
-                sum(1 for field in analysis["field_names"] if record.get(field))
-                for record in records
+            self.logger.info(
+                "File reading completed",
+                format=file_format,
+                records_count=len(result.data) if isinstance(result.data, list) else 1
             )
             
-            analysis["data_quality_score"] = filled_fields / total_fields if total_fields > 0 else 0.0
-        
-        # Add recommendations
-        if analysis["data_quality_score"] < 0.8:
-            analysis["recommendations"].append("Consider data quality improvement")
-        
-        if len(analysis["field_names"]) < 5:
-            analysis["recommendations"].append("File may be missing important fields")
-        
-        return analysis
+            return result
+            
+        except Exception as e:
+            return await self.handle_error(e, {"data_type": type(data).__name__, "context": context})
     
-    async def validate_input(self, input_data: Dict[str, Any]) -> bool:
-        """Validate input data."""
-        required_fields = ["file_path"]
+    async def _detect_file_format(self, file_path: Optional[str], file_data: Any) -> FileFormat:
+        """
+        Detect file format using LLM or file extension.
         
-        for field in required_fields:
-            if field not in input_data:
-                self.logger.error(f"Missing required field: {field}")
-                return False
+        Args:
+            file_path: Path to the file
+            file_data: File data content
+            
+        Returns:
+            FileFormat: Detected file format
+        """
+        try:
+            # First try file extension
+            if file_path:
+                extension = Path(file_path).suffix.lower()
+                format_mapping = {
+                    '.csv': FileFormat.CSV,
+                    '.xlsx': FileFormat.EXCEL,
+                    '.xls': FileFormat.EXCEL,
+                    '.json': FileFormat.JSON,
+                    '.xml': FileFormat.XML,
+                    '.txt': FileFormat.FIXED_WIDTH
+                }
+                
+                if extension in format_mapping:
+                    detected_format = format_mapping[extension]
+                    self.logger.info("File format detected by extension", format=detected_format.value)
+                    return detected_format
+            
+            # Use LLM for intelligent detection if available
+            if self.llm_provider and file_data:
+                return await self._detect_format_with_llm(file_path, file_data)
+            
+            # Default to CSV if cannot determine
+            self.logger.warning("Could not detect file format, defaulting to CSV")
+            return FileFormat.CSV
+            
+        except Exception as e:
+            self.logger.error("Error detecting file format", error=str(e))
+            return FileFormat.CSV
+    
+    async def _detect_format_with_llm(self, file_path: Optional[str], file_data: Any) -> FileFormat:
+        """
+        Use LLM to detect file format.
         
-        file_path = input_data["file_path"]
-        if not os.path.exists(file_path):
-            self.logger.error(f"File does not exist: {file_path}")
-            return False
+        Args:
+            file_path: Path to the file
+            file_data: File data content
+            
+        Returns:
+            FileFormat: Detected file format
+        """
+        try:
+            # Prepare file preview
+            if isinstance(file_data, str):
+                preview = file_data[:1000]
+            else:
+                preview = str(file_data)[:1000]
+            
+            file_size = len(str(file_data))
+            
+            # Create detection prompt
+            prompt = get_prompt(
+                "file_reader_detect_format",
+                file_path=file_path or "unknown",
+                file_size=file_size,
+                file_preview=preview
+            )
+            
+            system_prompt = get_system_prompt("file_reader")
+            
+            # Get LLM response
+            response = await self.llm_provider.generate(prompt, system_prompt)
+            
+            # Parse response to determine format
+            response_lower = response.lower()
+            if 'csv' in response_lower:
+                return FileFormat.CSV
+            elif 'excel' in response_lower or 'xlsx' in response_lower:
+                return FileFormat.EXCEL
+            elif 'json' in response_lower:
+                return FileFormat.JSON
+            elif 'xml' in response_lower:
+                return FileFormat.XML
+            elif 'fixed' in response_lower or 'width' in response_lower:
+                return FileFormat.FIXED_WIDTH
+            else:
+                return FileFormat.CSV
+                
+        except Exception as e:
+            self.logger.error("LLM format detection failed", error=str(e))
+            return FileFormat.CSV
+    
+    async def _read_csv(
+        self,
+        file_path: Optional[str],
+        file_data: Any,
+        context: Optional[Dict[str, Any]]
+    ) -> AgentResult:
+        """Read CSV file."""
+        try:
+            if file_path:
+                # Read from file
+                encoding = context.get("encoding", "utf-8")
+                delimiter = context.get("delimiter", ",")
+                
+                with open(file_path, 'r', encoding=encoding) as file:
+                    reader = csv.DictReader(file, delimiter=delimiter)
+                    records = list(reader)
+            else:
+                # Read from data
+                import io
+                encoding = context.get("encoding", "utf-8")
+                delimiter = context.get("delimiter", ",")
+                
+                csv_data = io.StringIO(file_data)
+                reader = csv.DictReader(csv_data, delimiter=delimiter)
+                records = list(reader)
+            
+            self.logger.info("CSV file read successfully", records_count=len(records))
+            
+            return AgentResult(
+                success=True,
+                data=records,
+                metadata={
+                    "format": "csv",
+                    "records_count": len(records),
+                    "columns": list(records[0].keys()) if records else []
+                }
+            )
+            
+        except Exception as e:
+            self.logger.error("Error reading CSV file", error=str(e))
+            return AgentResult(
+                success=False,
+                errors=[f"CSV reading error: {str(e)}"]
+            )
+    
+    async def _read_excel(
+        self,
+        file_path: Optional[str],
+        file_data: Any,
+        context: Optional[Dict[str, Any]]
+    ) -> AgentResult:
+        """Read Excel file."""
+        try:
+            if file_path:
+                # Read from file
+                sheet_name = context.get("sheet_name", 0)
+                df = pd.read_excel(file_path, sheet_name=sheet_name)
+            else:
+                # Read from data (would need to save to temp file first)
+                return AgentResult(
+                    success=False,
+                    errors=["Excel file reading from data not implemented"]
+                )
+            
+            # Convert to list of dictionaries
+            records = df.to_dict('records')
+            
+            self.logger.info("Excel file read successfully", records_count=len(records))
+            
+            return AgentResult(
+                success=True,
+                data=records,
+                metadata={
+                    "format": "excel",
+                    "records_count": len(records),
+                    "columns": list(df.columns)
+                }
+            )
+            
+        except Exception as e:
+            self.logger.error("Error reading Excel file", error=str(e))
+            return AgentResult(
+                success=False,
+                errors=[f"Excel reading error: {str(e)}"]
+            )
+    
+    async def _read_json(
+        self,
+        file_path: Optional[str],
+        file_data: Any,
+        context: Optional[Dict[str, Any]]
+    ) -> AgentResult:
+        """Read JSON file."""
+        try:
+            if file_path:
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    data = json.load(file)
+            else:
+                data = json.loads(file_data)
+            
+            # Handle different JSON structures
+            if isinstance(data, list):
+                records = data
+            elif isinstance(data, dict):
+                # Check if it's a single record or container
+                if any(key in data for key in ['records', 'data', 'items']):
+                    records = data.get('records', data.get('data', data.get('items', [data])))
+                else:
+                    records = [data]
+            else:
+                records = [data]
+            
+            self.logger.info("JSON file read successfully", records_count=len(records))
+            
+            return AgentResult(
+                success=True,
+                data=records,
+                metadata={
+                    "format": "json",
+                    "records_count": len(records),
+                    "structure": "array" if isinstance(data, list) else "object"
+                }
+            )
+            
+        except Exception as e:
+            self.logger.error("Error reading JSON file", error=str(e))
+            return AgentResult(
+                success=False,
+                errors=[f"JSON reading error: {str(e)}"]
+            )
+    
+    async def _read_xml(
+        self,
+        file_path: Optional[str],
+        file_data: Any,
+        context: Optional[Dict[str, Any]]
+    ) -> AgentResult:
+        """Read XML file."""
+        try:
+            if file_path:
+                tree = ET.parse(file_path)
+                root = tree.getroot()
+            else:
+                root = ET.fromstring(file_data)
+            
+            # Convert XML to list of dictionaries
+            records = []
+            record_tag = context.get("record_tag", "record")
+            
+            for element in root.findall(f".//{record_tag}"):
+                record = {}
+                for child in element:
+                    record[child.tag] = child.text
+                records.append(record)
+            
+            # If no records found with specified tag, try to extract from root
+            if not records and root:
+                record = {}
+                for child in root:
+                    record[child.tag] = child.text
+                if record:
+                    records = [record]
+            
+            self.logger.info("XML file read successfully", records_count=len(records))
+            
+            return AgentResult(
+                success=True,
+                data=records,
+                metadata={
+                    "format": "xml",
+                    "records_count": len(records),
+                    "root_tag": root.tag
+                }
+            )
+            
+        except Exception as e:
+            self.logger.error("Error reading XML file", error=str(e))
+            return AgentResult(
+                success=False,
+                errors=[f"XML reading error: {str(e)}"]
+            )
+    
+    async def _read_fixed_width(
+        self,
+        file_path: Optional[str],
+        file_data: Any,
+        context: Optional[Dict[str, Any]]
+    ) -> AgentResult:
+        """Read fixed-width file."""
+        try:
+            # Get field specifications
+            field_specs = context.get("field_specs", [])
+            if not field_specs:
+                return AgentResult(
+                    success=False,
+                    errors=["Field specifications required for fixed-width files"]
+                )
+            
+            if file_path:
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    lines = file.readlines()
+            else:
+                lines = file_data.split('\n')
+            
+            records = []
+            for line_num, line in enumerate(lines, 1):
+                if not line.strip():
+                    continue
+                
+                record = {}
+                for field_spec in field_specs:
+                    field_name = field_spec['name']
+                    start_pos = field_spec['start'] - 1  # Convert to 0-based
+                    end_pos = field_spec['end']
+                    
+                    if end_pos <= len(line):
+                        value = line[start_pos:end_pos].strip()
+                        record[field_name] = value
+                    else:
+                        record[field_name] = ""
+                
+                records.append(record)
+            
+            self.logger.info("Fixed-width file read successfully", records_count=len(records))
+            
+            return AgentResult(
+                success=True,
+                data=records,
+                metadata={
+                    "format": "fixed_width",
+                    "records_count": len(records),
+                    "field_count": len(field_specs)
+                }
+            )
+            
+        except Exception as e:
+            self.logger.error("Error reading fixed-width file", error=str(e))
+            return AgentResult(
+                success=False,
+                errors=[f"Fixed-width reading error: {str(e)}"]
+            )
+    
+    async def get_file_metadata(self, file_path: str) -> Dict[str, Any]:
+        """
+        Get file metadata information.
         
-        return True
+        Args:
+            file_path: Path to the file
+            
+        Returns:
+            Dict[str, Any]: File metadata
+        """
+        try:
+            path = Path(file_path)
+            
+            metadata = {
+                "file_name": path.name,
+                "file_size": path.stat().st_size,
+                "file_extension": path.suffix,
+                "created_time": path.stat().st_ctime,
+                "modified_time": path.stat().st_mtime,
+                "exists": path.exists()
+            }
+            
+            self.logger.info("File metadata retrieved", file_path=file_path)
+            return metadata
+            
+        except Exception as e:
+            self.logger.error("Error getting file metadata", error=str(e))
+            return {"error": str(e)}
+    
+    async def validate_file_structure(self, data: List[Dict[str, Any]]) -> AgentResult:
+        """
+        Validate file structure and data consistency.
+        
+        Args:
+            data: File data to validate
+            
+        Returns:
+            AgentResult: Validation result
+        """
+        try:
+            if not data:
+                return AgentResult(
+                    success=False,
+                    errors=["No data to validate"]
+                )
+            
+            # Check if all records have the same structure
+            first_record_keys = set(data[0].keys())
+            errors = []
+            warnings = []
+            
+            for i, record in enumerate(data[1:], 1):
+                record_keys = set(record.keys())
+                
+                # Check for missing keys
+                missing_keys = first_record_keys - record_keys
+                if missing_keys:
+                    errors.append(f"Record {i}: Missing keys {missing_keys}")
+                
+                # Check for extra keys
+                extra_keys = record_keys - first_record_keys
+                if extra_keys:
+                    warnings.append(f"Record {i}: Extra keys {extra_keys}")
+            
+            # Check for empty records
+            empty_records = [i for i, record in enumerate(data) if not any(record.values())]
+            if empty_records:
+                warnings.append(f"Empty records found at positions: {empty_records}")
+            
+            success = len(errors) == 0
+            
+            self.logger.info(
+                "File structure validation completed",
+                success=success,
+                errors_count=len(errors),
+                warnings_count=len(warnings)
+            )
+            
+            return AgentResult(
+                success=success,
+                data=data,
+                errors=errors,
+                warnings=warnings,
+                metadata={
+                    "total_records": len(data),
+                    "field_count": len(first_record_keys),
+                    "fields": list(first_record_keys)
+                }
+            )
+            
+        except Exception as e:
+            return await self.handle_error(e, {"data_length": len(data) if data else 0})

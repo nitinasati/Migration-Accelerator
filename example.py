@@ -2,8 +2,8 @@
 """
 Example usage of the Migration-Accelerators platform
 
-This script demonstrates how to use the platform to migrate data
-from legacy systems to modern platforms using Agentic AI.
+This script demonstrates how to use the platform to migrate insurance data
+from legacy mainframe systems to modern platforms.
 """
 
 import asyncio
@@ -54,19 +54,19 @@ async def example_migration():
     # Step 2: Load or create mapping configuration
     print("\n2. Loading mapping configuration...")
     
-    mapping_file = "config/mappings/sample_mapping.yaml"
+    mapping_file = "config/mappings/disability_mapping.yaml"
     try:
         mapping_config = load_mapping_config(mapping_file)
         print(f"   ✓ Mapping configuration loaded from {mapping_file}")
     except FileNotFoundError:
         print(f"   ⚠ Mapping file not found, creating default...")
-        mapping_config = create_default_mapping_config("customer_data")
+        mapping_config = create_default_mapping_config("disability")
         print("   ✓ Default mapping configuration created")
     
     # Step 3: Check input file
     print("\n3. Checking input file...")
     
-    input_file = "data/input/sample_data.csv"
+    input_file = "data/input/sample_disability_data.csv"
     if not os.path.exists(input_file):
         print(f"   ❌ Input file not found: {input_file}")
         print("   Please ensure the sample data file exists")
@@ -87,203 +87,147 @@ async def example_migration():
         result = await workflow.run(
             file_path=input_file,
             mapping_config=mapping_config,
-            record_type="customer_data"
+            record_type="disability"
         )
         
         # Step 6: Display results
         print("\n6. Migration Results:")
         print("=" * 40)
         
-        if result["success"]:
+        if result["migration_summary"]["success"]:
             print("   ✅ Migration completed successfully!")
         else:
             print("   ❌ Migration failed")
-            if "error" in result:
-                print(f"   Error: {result['error']}")
         
-        summary = result.get("summary", {})
+        summary = result["migration_summary"]
+        print(f"   📊 Records processed: {summary.get('total_records_processed', 0)}")
+        print(f"   📈 Progress: {summary.get('progress', 0):.1f}%")
+        print(f"   ✅ Completed steps: {len(summary.get('completed_steps', []))}")
         
-        print(f"   Total Records: {summary.get('total_records', 0)}")
-        print(f"   Successful: {summary.get('successful_records', 0)}")
-        print(f"   Failed: {summary.get('failed_records', 0)}")
+        # Show completed steps
+        completed_steps = summary.get("completed_steps", [])
+        if completed_steps:
+            print("\n   Completed Steps:")
+            for step in completed_steps:
+                print(f"     ✓ {step.replace('_', ' ').title()}")
         
-        success_rate = summary.get("success_rate", 0)
-        print(f"   Success Rate: {success_rate:.1%}")
-        
-        duration = summary.get("duration_seconds")
-        if duration:
-            print(f"   Duration: {duration:.2f} seconds")
-        
-        # Display errors and warnings
-        errors = summary.get("errors", [])
-        warnings = summary.get("warnings", [])
-        
+        # Show errors if any
+        errors = result.get("errors", [])
         if errors:
-            print(f"\n   Errors ({len(errors)}):")
-            for error in errors[:5]:  # Show first 5 errors
+            print(f"\n   ⚠ Errors ({len(errors)}):")
+            for error in errors[:3]:  # Show first 3 errors
                 print(f"     • {error}")
-            if len(errors) > 5:
-                print(f"     ... and {len(errors) - 5} more")
+            if len(errors) > 3:
+                print(f"     ... and {len(errors) - 3} more errors")
         
+        # Show warnings if any
+        warnings = result.get("warnings", [])
         if warnings:
-            print(f"\n   Warnings ({len(warnings)}):")
-            for warning in warnings[:5]:  # Show first 5 warnings
+            print(f"\n   ⚠ Warnings ({len(warnings)}):")
+            for warning in warnings[:3]:  # Show first 3 warnings
                 print(f"     • {warning}")
-            if len(warnings) > 5:
-                print(f"     ... and {len(warnings) - 5} more")
+            if len(warnings) > 3:
+                print(f"     ... and {len(warnings) - 3} more warnings")
         
-        # Display agent status
-        print(f"\n7. Agent Status:")
+        # Step 7: Show data pipeline
+        print("\n7. Data Pipeline:")
         print("=" * 40)
         
-        agent_status = await workflow.get_agent_status()
-        for agent_name, status in agent_status.items():
-            print(f"   • {agent_name}: {status['status']}")
-            if 'duration_seconds' in status['metrics']:
-                print(f"     Duration: {status['metrics']['duration_seconds']:.2f}s")
-            if 'records_processed' in status['metrics']:
-                print(f"     Records: {status['metrics']['records_processed']}")
+        pipeline = result.get("data_pipeline", {})
+        
+        if pipeline.get("file_data"):
+            print(f"   📁 File Data: {len(pipeline['file_data'])} records")
+        
+        if pipeline.get("validated_data"):
+            validated_data = pipeline["validated_data"]
+            if isinstance(validated_data, dict) and "validation_results" in validated_data:
+                print(f"   ✅ Validated Data: {len(validated_data['validation_results'])} validation results")
+            else:
+                print(f"   ✅ Validated Data: {len(validated_data)} records")
+        
+        if pipeline.get("mapped_data"):
+            print(f"   🔄 Mapped Data: {len(pipeline['mapped_data'])} records")
+        
+        if pipeline.get("transformed_data"):
+            transformed_data = pipeline["transformed_data"]
+            if isinstance(transformed_data, str):
+                print(f"   🔧 Transformed Data: JSON string ({len(transformed_data)} characters)")
+            else:
+                print(f"   🔧 Transformed Data: {len(transformed_data)} records")
+        
+        if pipeline.get("api_results"):
+            api_results = pipeline["api_results"]
+            if isinstance(api_results, dict) and "api_results" in api_results:
+                print(f"   🌐 API Results: {len(api_results['api_results'])} API calls")
+            else:
+                print(f"   🌐 API Results: Available")
         
     except Exception as e:
-        print(f"\n❌ Migration failed: {str(e)}")
+        print(f"   ❌ Migration failed with error: {e}")
         import traceback
         traceback.print_exc()
     
     finally:
-        # Cleanup
-        await workflow.cleanup()
+        # Step 8: Cleanup
+        print("\n8. Cleaning up...")
+        await workflow.close()
         if mcp_manager:
             await mcp_manager.close()
+        print("   ✓ Cleanup completed")
+    
+    print("\n🎉 Example completed!")
+    print("=" * 60)
 
 
-async def example_individual_agents():
-    """Example of using individual agents."""
+async def example_absence_migration():
+    """Example of absence data migration."""
     
-    print("\n🔧 Individual Agent Examples")
-    print("=" * 40)
+    print("\n🚀 Starting Absence Data Migration Example")
+    print("=" * 60)
     
-    # Example 1: File Reader Agent
-    print("\n1. File Reader Agent Example:")
+    # Check if absence data exists
+    input_file = "data/input/sample_absence_data.csv"
+    mapping_file = "config/mappings/absence_mapping.yaml"
     
-    from agents.file_reader import FileReaderAgent
+    if not os.path.exists(input_file):
+        print(f"   ❌ Absence data file not found: {input_file}")
+        return
     
-    file_reader = FileReaderAgent()
-    input_file = "data/input/sample_disability_data.csv"
-    
-    if os.path.exists(input_file):
-        result = await file_reader.execute({
-            "file_path": input_file,
-            "file_format": "csv",
-            "record_type": "disability"
-        })
-        
-        print(f"   • Records read: {result['total_records']}")
-        print(f"   • File format: {result['file_format']}")
-        print(f"   • Record type: {result['record_type']}")
-        
-        # Show first record
-        if result['records']:
-            first_record = result['records'][0]
-            print(f"   • First record policy: {first_record.get('policy_number', 'N/A')}")
-            print(f"   • First record employee: {first_record.get('employee_id', 'N/A')}")
-    
-    # Example 2: LLM Provider
-    print("\n2. LLM Provider Example:")
+    if not os.path.exists(mapping_file):
+        print(f"   ❌ Absence mapping file not found: {mapping_file}")
+        return
     
     try:
+        # Load mapping configuration
+        mapping_config = load_mapping_config(mapping_file)
+        print(f"   ✓ Absence mapping configuration loaded")
+        
+        # Initialize workflow
         llm_config = settings.get_llm_config()
-        llm_provider = LLMProviderFactory.create(llm_config)
-        
-        # Test LLM generation
-        prompt = "What is the capital of France?"
-        response = await llm_provider.generate(prompt)
-        print(f"   • LLM Response: {response[:100]}...")
-        
-    except Exception as e:
-        print(f"   • LLM not available: {e}")
-    
-    # Example 3: MCP Tools
-    print("\n3. MCP Tools Example:")
-    
-    try:
         mcp_config = settings.get_mcp_config()
-        mcp_manager = MCPToolManager(mcp_config)
-        await mcp_manager.initialize()
+        workflow = MigrationWorkflow(llm_config, mcp_config)
         
-        # List available tools
-        tools = await mcp_manager.list_available_tools()
-        print(f"   • Available tools: {len(tools)}")
-        for tool in tools:
-            print(f"     - {tool.get('name', 'Unknown')}: {tool.get('description', 'No description')}")
+        # Run migration
+        result = await workflow.run(
+            file_path=input_file,
+            mapping_config=mapping_config,
+            record_type="absence"
+        )
         
-        await mcp_manager.close()
+        # Display results
+        summary = result["migration_summary"]
+        print(f"   📊 Absence records processed: {summary.get('total_records_processed', 0)}")
+        print(f"   ✅ Success: {summary.get('success', False)}")
+        
+        await workflow.close()
         
     except Exception as e:
-        print(f"   • MCP not available: {e}")
-
-
-def example_configuration():
-    """Example of configuration management."""
-    
-    print("\n⚙️ Configuration Examples")
-    print("=" * 40)
-    
-    # Show current settings
-    print("\n1. Current Platform Settings:")
-    
-    print(f"   • LLM Provider: {settings.llm_provider.value}")
-    print(f"   • LLM Model: {settings.llm_model}")
-    print(f"   • MCP Server: {settings.mcp_server_url}")
-    print(f"   • LangSmith Project: {settings.langchain_project}")
-    print(f"   • Input Directory: {settings.input_dir}")
-    print(f"   • Output Directory: {settings.output_dir}")
-    
-    # Show mapping configuration
-    print("\n2. Mapping Configuration Example:")
-    
-    mapping_file = "config/mappings/disability_mapping.yaml"
-    if os.path.exists(mapping_file):
-        try:
-            mapping_config = load_mapping_config(mapping_file)
-            print(f"   • Source Format: {mapping_config.source_format}")
-            print(f"   • Target Format: {mapping_config.target_format}")
-            print(f"   • Record Type: {mapping_config.record_type}")
-            print(f"   • Number of Rules: {len(mapping_config.rules)}")
-            
-            # Show first few rules
-            for i, rule in enumerate(mapping_config.rules[:3]):
-                print(f"     Rule {i+1}: {rule.source_field} → {rule.target_field} ({rule.transformation_type.value})")
-            
-        except Exception as e:
-            print(f"   • Error loading mapping: {e}")
-    else:
-        print("   • No mapping file found")
-
-
-def main():
-    """Main function to run all examples."""
-    
-    print("🎯 Agentic Insurance Data Migration Platform - Examples")
-    print("=" * 70)
-    
-    # Run configuration examples
-    example_configuration()
-    
-    # Run individual agent examples
-    asyncio.run(example_individual_agents())
-    
-    # Run complete migration example
-    print("\n" + "=" * 70)
-    asyncio.run(example_migration())
-    
-    print("\n🎉 All examples completed!")
-    print("\nTo run the platform with your own data:")
-    print("  python main.py migrate your_data.csv --mapping your_mapping.yaml")
-    print("\nTo validate your setup:")
-    print("  python main.py validate your_data.csv")
-    print("\nTo check platform status:")
-    print("  python main.py status")
+        print(f"   ❌ Absence migration failed: {e}")
 
 
 if __name__ == "__main__":
-    main()
+    # Run the main example
+    asyncio.run(example_migration())
+    
+    # Run absence migration example
+    asyncio.run(example_absence_migration())
