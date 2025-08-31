@@ -4,9 +4,7 @@ Main CLI interface for the Migration-Accelerators platform.
 """
 
 import asyncio
-import json
 import os
-import sys
 from pathlib import Path
 from typing import Optional
 
@@ -15,11 +13,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.prompt import Confirm
-
 from config.settings import settings, LLMConfig, MCPConfig, FieldMappingConfig, get_llm_config, get_mcp_config, get_langsmith_config
-from llm.providers import LLMProviderFactory
-from mcp_tools.client import MCPToolManager
 from workflows.migration_graph import MigrationWorkflow
 from config.mappings import load_mapping_config
 

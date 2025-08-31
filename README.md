@@ -250,8 +250,7 @@ python main.py migrate data/input/sample_disability_data.csv --dry-run
 │   ├── validation.py      # Validation agent with batch processing
 │   ├── mapping.py         # Mapping agent
 │   ├── transformation.py  # Transformation agent
-│   ├── api_integration.py # API integration agent
-│   └── orchestration.py   # Orchestration agent
+│   └── api_integration.py # API integration agent
 ├── workflows/             # LangGraph workflows
 │   └── migration_graph.py # Main migration workflow with graph generation
 ├── llm/                   # LLM provider abstractions

@@ -254,28 +254,7 @@ class TestAPIIntegrationAgent:
         assert "test_endpoint" in agent.api_endpoints
 
 
-class TestOrchestrationAgent:
-    """Test orchestration agent functionality."""
-    
-    @pytest.mark.asyncio
-    async def test_orchestration_agent_creation(self):
-        """Test orchestration agent creation."""
-        from agents.orchestration import OrchestrationAgent
-        
-        agent = OrchestrationAgent()
-        assert agent is not None
-        assert agent.agent_name == "orchestration"
-    
-    def test_workflow_state_initialization(self):
-        """Test workflow state initialization."""
-        from agents.orchestration import OrchestrationAgent
-        
-        agent = OrchestrationAgent()
-        
-        assert agent.workflow_state is not None
-        assert "current_step" in agent.workflow_state
-        assert "completed_steps" in agent.workflow_state
-        assert "errors" in agent.workflow_state
+
 
 
 class TestMigrationWorkflow:
