@@ -1,10 +1,10 @@
 {
   "metadata": {
     "endpoint": "disability_policy",
-    "timestamp": "2025-08-31T19:41:08.336988",
+    "timestamp": "2025-08-31T20:33:11.388924",
     "record_count": 10,
     "output_mode": "file",
-    "file_path": "data/output\\disability_policy_20250831_194108.json"
+    "file_path": "data/output\\disability_policy_20250831_203311.json"
   },
   "data": [
     {
@@ -13,13 +13,13 @@
       "employerId": "EMP789012",
       "effectiveDate": "2023-01-01T00:00:00",
       "terminationDate": null,
-      "benefitAmount": "50000.00",
-      "premiumAmount": "2500.00",
+      "benefitAmount": 50000.0,
+      "premiumAmount": 2500.0,
       "policyStatus": "ACTIVE",
       "coverageType": "SHORT_TERM_DISABILITY",
       "waitingPeriodDays": 90,
       "benefitPercentage": 60.0,
-      "maxBenefitDurationMonths": "24",
+      "maxBenefitDurationMonths": 24,
       "eliminationPeriodDays": 14,
       "preExistingCondition": "false",
       "occupationClass": "A",
@@ -27,7 +27,7 @@
       "metadata.updatedAt": "2023-01-01T09:00:00",
       "_mapping_metadata": {
         "record_type": "disability",
-        "transformation_timestamp": "2025-08-31T23:41:08.330675",
+        "transformation_timestamp": "2025-09-01T00:33:11.365942",
         "source_fields_count": 17,
         "target_fields_count": 17
       }
@@ -38,13 +38,13 @@
       "employerId": "EMP789012",
       "effectiveDate": "2023-01-15T00:00:00",
       "terminationDate": null,
-      "benefitAmount": "75000.00",
-      "premiumAmount": "3750.00",
+      "benefitAmount": 75000.0,
+      "premiumAmount": 3750.0,
       "policyStatus": "ACTIVE",
       "coverageType": "LONG_TERM_DISABILITY",
       "waitingPeriodDays": 180,
       "benefitPercentage": 70.0,
-      "maxBenefitDurationMonths": "60",
+      "maxBenefitDurationMonths": 60,
       "eliminationPeriodDays": 28,
       "preExistingCondition": "true",
       "occupationClass": "B",
@@ -52,7 +52,7 @@
       "metadata.updatedAt": "2023-01-15T10:30:00",
       "_mapping_metadata": {
         "record_type": "disability",
-        "transformation_timestamp": "2025-08-31T23:41:08.330847",
+        "transformation_timestamp": "2025-09-01T00:33:11.366977",
         "source_fields_count": 17,
         "target_fields_count": 17
       }
@@ -63,13 +63,13 @@
       "employerId": "EMP789013",
       "effectiveDate": "2023-02-01T00:00:00",
       "terminationDate": null,
-      "benefitAmount": "60000.00",
-      "premiumAmount": "3000.00",
+      "benefitAmount": 60000.0,
+      "premiumAmount": 3000.0,
       "policyStatus": "ACTIVE",
       "coverageType": "BOTH",
       "waitingPeriodDays": 90,
       "benefitPercentage": 65.0,
-      "maxBenefitDurationMonths": "36",
+      "maxBenefitDurationMonths": 36,
       "eliminationPeriodDays": 21,
       "preExistingCondition": "false",
       "occupationClass": "A",
@@ -77,7 +77,7 @@
       "metadata.updatedAt": "2023-02-01T14:15:00",
       "_mapping_metadata": {
         "record_type": "disability",
-        "transformation_timestamp": "2025-08-31T23:41:08.330997",
+        "transformation_timestamp": "2025-09-01T00:33:11.368195",
         "source_fields_count": 17,
         "target_fields_count": 17
       }
@@ -88,13 +88,13 @@
       "employerId": "EMP789013",
       "effectiveDate": "2023-02-15T00:00:00",
       "terminationDate": null,
-      "benefitAmount": "45000.00",
-      "premiumAmount": "2250.00",
+      "benefitAmount": 45000.0,
+      "premiumAmount": 2250.0,
       "policyStatus": "PENDING",
       "coverageType": "SHORT_TERM_DISABILITY",
       "waitingPeriodDays": 90,
       "benefitPercentage": 60.0,
-      "maxBenefitDurationMonths": "24",
+      "maxBenefitDurationMonths": 24,
       "eliminationPeriodDays": 14,
       "preExistingCondition": "false",
       "occupationClass": "C",
@@ -102,7 +102,7 @@
       "metadata.updatedAt": "2023-02-15T11:45:00",
       "_mapping_metadata": {
         "record_type": "disability",
-        "transformation_timestamp": "2025-08-31T23:41:08.331130",
+        "transformation_timestamp": "2025-09-01T00:33:11.369030",
         "source_fields_count": 17,
         "target_fields_count": 17
       }
@@ -113,13 +113,13 @@
       "employerId": "EMP789014",
       "effectiveDate": "2023-03-01T00:00:00",
       "terminationDate": null,
-      "benefitAmount": "80000.00",
-      "premiumAmount": "4000.00",
+      "benefitAmount": 80000.0,
+      "premiumAmount": 4000.0,
       "policyStatus": "ACTIVE",
       "coverageType": "LONG_TERM_DISABILITY",
       "waitingPeriodDays": 180,
       "benefitPercentage": 75.0,
-      "maxBenefitDurationMonths": "72",
+      "maxBenefitDurationMonths": 72,
       "eliminationPeriodDays": 28,
       "preExistingCondition": "true",
       "occupationClass": "A",
@@ -127,7 +127,7 @@
       "metadata.updatedAt": "2023-03-01T08:20:00",
       "_mapping_metadata": {
         "record_type": "disability",
-        "transformation_timestamp": "2025-08-31T23:41:08.331238",
+        "transformation_timestamp": "2025-09-01T00:33:11.370636",
         "source_fields_count": 17,
         "target_fields_count": 17
       }
@@ -138,13 +138,13 @@
       "employerId": "EMP789014",
       "effectiveDate": "2023-03-15T00:00:00",
       "terminationDate": null,
-      "benefitAmount": "55000.00",
-      "premiumAmount": "2750.00",
+      "benefitAmount": 55000.0,
+      "premiumAmount": 2750.0,
       "policyStatus": "INACTIVE",
       "coverageType": "SHORT_TERM_DISABILITY",
       "waitingPeriodDays": 90,
       "benefitPercentage": 60.0,
-      "maxBenefitDurationMonths": "24",
+      "maxBenefitDurationMonths": 24,
       "eliminationPeriodDays": 14,
       "preExistingCondition": "false",
       "occupationClass": "B",
@@ -152,7 +152,7 @@
       "metadata.updatedAt": "2023-03-15T16:30:00",
       "_mapping_metadata": {
         "record_type": "disability",
-        "transformation_timestamp": "2025-08-31T23:41:08.331337",
+        "transformation_timestamp": "2025-09-01T00:33:11.371549",
         "source_fields_count": 17,
         "target_fields_count": 17
       }
@@ -163,13 +163,13 @@
       "employerId": "EMP789015",
       "effectiveDate": "2023-04-01T00:00:00",
       "terminationDate": null,
-      "benefitAmount": "70000.00",
-      "premiumAmount": "3500.00",
+      "benefitAmount": 70000.0,
+      "premiumAmount": 3500.0,
       "policyStatus": "ACTIVE",
       "coverageType": "BOTH",
       "waitingPeriodDays": 90,
       "benefitPercentage": 70.0,
-      "maxBenefitDurationMonths": "48",
+      "maxBenefitDurationMonths": 48,
       "eliminationPeriodDays": 21,
       "preExistingCondition": "true",
       "occupationClass": "A",
@@ -177,7 +177,7 @@
       "metadata.updatedAt": "2023-04-01T12:00:00",
       "_mapping_metadata": {
         "record_type": "disability",
-        "transformation_timestamp": "2025-08-31T23:41:08.331447",
+        "transformation_timestamp": "2025-09-01T00:33:11.372174",
         "source_fields_count": 17,
         "target_fields_count": 17
       }
@@ -188,13 +188,13 @@
       "employerId": "EMP789015",
       "effectiveDate": "2023-04-15T00:00:00",
       "terminationDate": null,
-      "benefitAmount": "40000.00",
-      "premiumAmount": "2000.00",
+      "benefitAmount": 40000.0,
+      "premiumAmount": 2000.0,
       "policyStatus": "CANCELLED",
       "coverageType": "SHORT_TERM_DISABILITY",
       "waitingPeriodDays": 90,
       "benefitPercentage": 60.0,
-      "maxBenefitDurationMonths": "24",
+      "maxBenefitDurationMonths": 24,
       "eliminationPeriodDays": 14,
       "preExistingCondition": "false",
       "occupationClass": "C",
@@ -202,7 +202,7 @@
       "metadata.updatedAt": "2023-04-15T13:45:00",
       "_mapping_metadata": {
         "record_type": "disability",
-        "transformation_timestamp": "2025-08-31T23:41:08.331558",
+        "transformation_timestamp": "2025-09-01T00:33:11.372829",
         "source_fields_count": 17,
         "target_fields_count": 17
       }
@@ -213,13 +213,13 @@
       "employerId": "EMP789016",
       "effectiveDate": "2023-05-01T00:00:00",
       "terminationDate": null,
-      "benefitAmount": "90000.00",
-      "premiumAmount": "4500.00",
+      "benefitAmount": 90000.0,
+      "premiumAmount": 4500.0,
       "policyStatus": "ACTIVE",
       "coverageType": "LONG_TERM_DISABILITY",
       "waitingPeriodDays": 180,
       "benefitPercentage": 80.0,
-      "maxBenefitDurationMonths": "84",
+      "maxBenefitDurationMonths": 84,
       "eliminationPeriodDays": 28,
       "preExistingCondition": "true",
       "occupationClass": "A",
@@ -227,7 +227,7 @@
       "metadata.updatedAt": "2023-05-01T09:15:00",
       "_mapping_metadata": {
         "record_type": "disability",
-        "transformation_timestamp": "2025-08-31T23:41:08.331653",
+        "transformation_timestamp": "2025-09-01T00:33:11.373459",
         "source_fields_count": 17,
         "target_fields_count": 17
       }
@@ -238,13 +238,13 @@
       "employerId": "EMP789016",
       "effectiveDate": "2023-05-15T00:00:00",
       "terminationDate": null,
-      "benefitAmount": "65000.00",
-      "premiumAmount": "3250.00",
+      "benefitAmount": 65000.0,
+      "premiumAmount": 3250.0,
       "policyStatus": "SUSPENDED",
       "coverageType": "SHORT_TERM_DISABILITY",
       "waitingPeriodDays": 90,
       "benefitPercentage": 65.0,
-      "maxBenefitDurationMonths": "24",
+      "maxBenefitDurationMonths": 24,
       "eliminationPeriodDays": 14,
       "preExistingCondition": "false",
       "occupationClass": "B",
@@ -252,7 +252,7 @@
       "metadata.updatedAt": "2023-05-15T15:20:00",
       "_mapping_metadata": {
         "record_type": "disability",
-        "transformation_timestamp": "2025-08-31T23:41:08.331749",
+        "transformation_timestamp": "2025-09-01T00:33:11.374100",
         "source_fields_count": 17,
         "target_fields_count": 17
       }

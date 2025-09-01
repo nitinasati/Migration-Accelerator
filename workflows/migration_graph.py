@@ -9,15 +9,13 @@ from datetime import datetime, timedelta
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 import structlog
-import graphviz
-from pathlib import Path
+
 
 from agents.file_reader import FileReaderAgent
-from agents.validation import ValidationAgent
 from agents.mapping import MappingAgent
 from agents.transformation import TransformationAgent
 from agents.api_integration import APIIntegrationAgent
-from config.settings import LLMConfig, MCPConfig, FieldMappingConfig
+from config.settings import LLMConfig, MCPConfig
 from llm.providers import initialize_langsmith
 
 
@@ -36,7 +34,7 @@ class MigrationState(TypedDict):
         target_system: Configuration for the target system API integration
         
         file_data: Raw data read from the source file
-        validated_data: Data after validation and cleaning
+
         mapped_data: Data after field mapping transformation
         transformed_data: Final transformed data ready for target system
         api_results: Results from API calls to target system
@@ -56,14 +54,14 @@ class MigrationState(TypedDict):
     
     # Input data
     file_path: str
-    mapping_config: Optional[FieldMappingConfig]
+    mapping_config: Optional[Any]  # Will be selected by LLM agent
     record_type: str
     target_system: Dict[str, Any]
     
     # Workflow data
     file_data: Optional[List[Dict[str, Any]]]
-    validated_data: Optional[List[Dict[str, Any]]]
     mapped_data: Optional[List[Dict[str, Any]]]
+    mapping_metadata: Optional[Dict[str, Any]]
     transformed_data: Optional[Any]
     api_results: Optional[List[Dict[str, Any]]]
     
@@ -132,7 +130,6 @@ class MigrationWorkflow:
         
         # Initialize specialized agents for each workflow step
         self.file_reader = FileReaderAgent(llm_config, mcp_config)
-        self.validator = ValidationAgent(llm_config, mcp_config)
         self.mapper = MappingAgent(llm_config, mcp_config)
         self.transformer = TransformationAgent(llm_config, mcp_config)
         self.api_integrator = APIIntegrationAgent(llm_config, mcp_config)
@@ -149,7 +146,7 @@ class MigrationWorkflow:
         with error handling at each step.
         
         Workflow Structure:
-        - Linear progression: initialize → read_file → validate_data → map_data → transform_data → integrate_api → finalize
+        - Linear progression: initialize → read_file → map_data → transform_data → integrate_api → finalize
         - Error handling: Each step can route to handle_error if errors occur
         - Conditional routing: Uses _should_continue to determine next step
         
@@ -163,7 +160,6 @@ class MigrationWorkflow:
         # Add workflow nodes - each represents a processing step
         workflow.add_node("initialize", self._initialize_workflow)
         workflow.add_node("read_file", self._read_file_node)
-        workflow.add_node("validate_data", self._validate_data_node)
         workflow.add_node("map_data", self._map_data_node)
         workflow.add_node("transform_data", self._transform_data_node)
         workflow.add_node("integrate_api", self._integrate_api_node)
@@ -173,28 +169,19 @@ class MigrationWorkflow:
         # Set the entry point for the workflow
         workflow.set_entry_point("initialize")
         
-        # Add linear progression edges (success path)
-        workflow.add_edge("initialize", "read_file")
-        workflow.add_edge("read_file", "validate_data")
-        workflow.add_edge("validate_data", "map_data")
-        workflow.add_edge("map_data", "transform_data")
-        workflow.add_edge("transform_data", "integrate_api")
-        workflow.add_edge("integrate_api", "finalize")
-        workflow.add_edge("finalize", END)
-        
         # Add conditional edges for error handling at each step
         # If errors occur, route to handle_error; otherwise continue to next step
         workflow.add_conditional_edges(
-            "read_file",
+            "initialize",
             self._should_continue,
             {
-                "continue": "validate_data",
+                "continue": "read_file",
                 "error": "handle_error"
             }
         )
         
         workflow.add_conditional_edges(
-            "validate_data",
+            "read_file",
             self._should_continue,
             {
                 "continue": "map_data",
@@ -229,165 +216,17 @@ class MigrationWorkflow:
             }
         )
         
+        # Finalize always leads to workflow end
+        workflow.add_edge("finalize", END)
+        
         # Error handling always leads to workflow end
         workflow.add_edge("handle_error", END)
         
         # Compile the workflow for execution
         compiled_workflow = workflow.compile()
-        
-        # Store the uncompiled workflow for visualization
-        self._uncompiled_workflow = workflow
-        
         return compiled_workflow
     
-    def _get_workflow_structure(self) -> dict:
-        """
-        Get the workflow structure definition (nodes, edges, etc.).
-        This centralizes the workflow definition to avoid duplication.
-        
-        Returns:
-            Dictionary containing workflow structure information
-        """
-        return {
-            "nodes": {
-                "initialize": "Initialize\nWorkflow",
-                "read_file": "Read File\n(CSV/Excel/JSON)",
-                "validate_data": "Validate Data\n(Business Rules)",
-                "map_data": "Map Data\n(Field Transformations)",
-                "transform_data": "Transform Data\n(Format Conversion)",
-                "integrate_api": "API Integration\n(File Output)",
-                "finalize": "Finalize\nWorkflow",
-                "handle_error": "Handle Error\n(Error Processing)"
-            },
-            "edges": [
-                ("initialize", "read_file"),
-                ("read_file", "validate_data"),
-                ("validate_data", "map_data"),
-                ("map_data", "transform_data"),
-                ("transform_data", "integrate_api"),
-                ("integrate_api", "finalize"),
-                ("handle_error", "END")
-            ],
-            "conditional_edges": [
-                ("read_file", "handle_error"),
-                ("validate_data", "handle_error"),
-                ("map_data", "handle_error"),
-                ("transform_data", "handle_error"),
-                ("integrate_api", "handle_error")
-            ],
-            "entry_point": "initialize",
-            "error_node": "handle_error",
-            "end_node": "END"
-        }
-    
-    def generate_graph_image(self, output_path: str = "migration_workflow_graph.png") -> str:
-        """
-        Generate and save a visual representation of the migration workflow graph.
-        
-        Args:
-            output_path: Path where to save the graph image
-            
-        Returns:
-            Path to the generated image file
-        """
-        try:
-            # Get workflow structure from shared definition
-            structure = self._get_workflow_structure()
-            
-            # Create a new graph
-            dot = graphviz.Digraph(comment='Migration Workflow')
-            dot.attr(rankdir='TB', size='12,8')
-            dot.attr('node', shape='box', style='rounded,filled', fillcolor='lightblue')
-            dot.attr('edge', color='gray')
-            
-            # Add nodes to the graph
-            for node_id, label in structure["nodes"].items():
-                if node_id == structure["error_node"]:
-                    dot.node(node_id, label, fillcolor='lightcoral')
-                elif node_id == "finalize":
-                    dot.node(node_id, label, fillcolor='lightgreen')
-                else:
-                    dot.node(node_id, label)
-            
-            # Add regular edges
-            for start, end in structure["edges"]:
-                if end == structure["end_node"]:
-                    dot.node(structure["end_node"], "End", shape='doublecircle', fillcolor='lightgray')
-                dot.edge(start, end, color='blue')
-            
-            # Add conditional edges (error paths)
-            for start, end in structure["conditional_edges"]:
-                dot.edge(start, end, color='red', style='dashed', label='on error')
-            
-            # Add title
-            dot.attr(label='Migration-Accelerators Workflow\nAgentic AI Data Migration Platform', 
-                    fontsize='16', fontname='bold')
-            
-            # Ensure output directory exists
-            output_path = Path(output_path)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            # Render the graph
-            dot.render(output_path.with_suffix(''), format='png', cleanup=True)
-            
-            self.logger.info("Workflow graph generated", output_path=str(output_path))
-            return str(output_path)
-            
-        except ImportError:
-            self.logger.warning("graphviz not available for graph visualization")
-            return ""
-        except Exception as e:
-            self.logger.error("Failed to generate workflow graph", error=str(e))
-            return ""
-    
-    def print_graph_structure(self) -> None:
-        """
-        Print the workflow graph structure to console.
-        """
-        try:
-            # Get workflow structure from shared definition
-            structure = self._get_workflow_structure()
-            
-            print("\n" + "="*60)
-            print("🔄 MIGRATION WORKFLOW GRAPH STRUCTURE")
-            print("="*60)
-            
-            # Build display structure from shared definition
-            nodes_display = []
-            for node_id, label in structure["nodes"].items():
-                nodes_display.append(f"{node_id} → {label.replace(chr(10), ' ')}")
-            
-            flow_display = []
-            for start, end in structure["edges"]:
-                if end != structure["end_node"]:
-                    flow_display.append(f"{start} → {end}")
-                else:
-                    flow_display.append(f"{start} → {end}")
-            
-            # Add conditional flows
-            for start, end in structure["conditional_edges"]:
-                flow_display.append(f"{start} → {end} (on error)")
-            
-            print(f"📋 Entry Point: {structure['entry_point']}")
-            print(f"\n🔧 Workflow Nodes ({len(structure['nodes'])}):")
-            for i, node in enumerate(nodes_display, 1):
-                print(f"   {i}. {node}")
-            
-            print(f"\n🔄 Workflow Flow:")
-            for i, flow in enumerate(flow_display, 1):
-                print(f"   {i}. {flow}")
-            
-            print(f"\n📊 Workflow Statistics:")
-            print(f"   • Total Nodes: {len(structure['nodes'])}")
-            print(f"   • Processing Steps: 6 (read → validate → map → transform → integrate → finalize)")
-            print(f"   • Error Handling: Centralized error handling with {structure['error_node']} node")
-            print(f"   • Success Path: Linear progression through all processing steps")
-            print(f"   • Error Path: Any step can redirect to error handling")
-            
-            print("="*60)
-            
-        except Exception as e:
-            self.logger.error("Failed to print workflow structure", error=str(e))
+
     
     async def _initialize_workflow(self, state: MigrationState) -> MigrationState:
         """
@@ -406,7 +245,7 @@ class MigrationWorkflow:
         
         # Initialize all specialized agents for the workflow steps
         await self.file_reader.initialize()
-        await self.validator.initialize()
+
         await self.mapper.initialize()
         await self.transformer.initialize()
         await self.api_integrator.initialize()
@@ -453,7 +292,7 @@ class MigrationWorkflow:
                 # Store parsed file data in workflow state
                 state["file_data"] = result.data
                 state["completed_steps"].append("read_file")
-                state["progress"] = 20.0
+                state["progress"] = 25.0
                 state["current_step"] = "file_read"
                 
                 self.logger.info("File read successfully", records_count=len(result.data) if isinstance(result.data, list) else 1)
@@ -473,105 +312,16 @@ class MigrationWorkflow:
             state["current_step"] = "file_read_error"
             return state
     
-    async def _validate_data_node(self, state: MigrationState) -> MigrationState:
+
+    async def _map_data_node(self, state: MigrationState) -> MigrationState:
         """
-        Validate the file data against schema and business rules.
+        Apply intelligent field mapping transformations using LLM.
         
-        This node uses the ValidationAgent to check data quality, required fields,
-        data types, patterns, and business rules. It ensures data integrity
-        before proceeding with mapping and transformation.
+        This node uses the LLM-powered MappingAgent to analyze data attributes,
+        select appropriate mapping configurations, and transform data intelligently.
         
         Args:
             state: Current workflow state containing file_data
-            
-        Returns:
-            MigrationState: Updated state with validated_data or validation errors
-        """
-        try:
-            self.logger.info("Validating data")
-            
-            # Check if file data exists from previous step
-            if not state["file_data"]:
-                state["errors"].append("No file data to validate")
-                state["current_step"] = "validation_error"
-                return state
-            
-            # Prepare validation context with rules and schema
-            mapping_rules = state["mapping_config"].rules if state["mapping_config"] else []
-            validation_rules = []
-            for rule in mapping_rules:
-                if rule.validation:
-                    # Create a combined rule with field name and validation rule
-                    validation_rules.append({
-                        "field_name": rule.source_field,
-                        "validation_rule": rule.validation
-                    })
-            
-            validation_context = {
-                "record_type": state["record_type"],
-                "validation_rules": validation_rules,
-                "schema": None
-            }
-            
-            # Use ValidationAgent to validate data quality and rules
-            result = await self.validator.process(state["file_data"], validation_context)
-            
-            if result.success:
-                # Extract valid records from validation result
-                validation_data = result.data
-                if isinstance(validation_data, dict) and "valid_records" in validation_data:
-                    # Get the original records from the validation results
-                    valid_records = []
-                    for validation_result in validation_data.get("validation_results", []):
-                        if hasattr(validation_result, 'record'):
-                            valid_records.append(validation_result.record)
-                        elif isinstance(validation_result, dict) and 'record' in validation_result:
-                            valid_records.append(validation_result['record'])
-                    
-                    # If no records extracted from validation results, use original file data
-                    if not valid_records:
-                        valid_records = state["file_data"]
-                    
-                    state["validated_data"] = valid_records
-                else:
-                    # Fallback to original file data if validation result format is unexpected
-                    state["validated_data"] = state["file_data"]
-                
-                state["completed_steps"].append("validate_data")
-                state["progress"] = 40.0
-                state["current_step"] = "data_validated"
-                
-                # Collect any warnings from validation
-                if result.warnings:
-                    state["warnings"].extend(result.warnings)
-                
-                self.logger.info("Data validation successful")
-            else:
-                # Record validation errors
-                state["errors"].extend(result.errors)
-                state["current_step"] = "validation_error"
-                
-                self.logger.error("Data validation failed", errors=result.errors)
-            
-            return state
-            
-        except Exception as e:
-            # Handle unexpected errors during validation
-            self.logger.error("Error in validate data node", error=str(e))
-            state["errors"].append(f"Data validation error: {str(e)}")
-            state["current_step"] = "validation_error"
-            return state
-    
-    async def _map_data_node(self, state: MigrationState) -> MigrationState:
-        """
-        Apply field mapping transformations to validated data.
-        
-        This node uses the MappingAgent to transform source field names and values
-        to target field names according to the mapping configuration. It handles
-        direct mappings, transformations, lookups, and calculated fields.
-        
-        Args:
-            state: Current workflow state containing validated_data and mapping_config
             
         Returns:
             MigrationState: Updated state with mapped_data or mapping errors
@@ -580,31 +330,25 @@ class MigrationWorkflow:
             self.logger.info("Mapping data")
             
             # Validate prerequisites for mapping
-            if not state["validated_data"]:
-                state["errors"].append("No validated data to map")
+            if not state["file_data"]:
+                state["errors"].append("No file data to map")
                 state["current_step"] = "mapping_error"
                 return state
             
-            if not state["mapping_config"]:
-                state["errors"].append("No mapping configuration provided")
-                state["current_step"] = "mapping_error"
-                return state
-            
-            # Prepare mapping context with rules and record type
-            mapping_context = {
-                "mapping_rules": state["mapping_config"].rules,
-                "record_type": state["record_type"]
-            }
-            
-            # Use MappingAgent to apply field mappings
-            result = await self.mapper.process(state["validated_data"], mapping_context)
+            # Use LLM-powered MappingAgent for intelligent mapping
+            # The agent will automatically select appropriate mapping configuration
+            result = await self.mapper.process(state["file_data"], {})
             
             if result.success:
                 # Store mapped data and update progress
                 state["mapped_data"] = result.data
                 state["completed_steps"].append("map_data")
-                state["progress"] = 60.0
+                state["progress"] = 50.0
                 state["current_step"] = "data_mapped"
+                
+                # Store mapping metadata for transformation step
+                if result.metadata:
+                    state["mapping_metadata"] = result.metadata
                 
                 # Collect any warnings from mapping
                 if result.warnings:
@@ -650,26 +394,30 @@ class MigrationWorkflow:
                 state["current_step"] = "transformation_error"
                 return state
             
-            if not state["mapping_config"]:
+            # Get mapping configuration from mapping agent's metadata
+            mapping_metadata = state.get("mapping_metadata", {})
+            mapping_config = mapping_metadata.get("mapping_config")
+            record_type = mapping_metadata.get("record_type", "unknown")
+            
+            if not mapping_config:
                 state["errors"].append("No mapping configuration for transformation")
                 state["current_step"] = "transformation_error"
                 return state
             
-            # Prepare transformation context with format information
+            # Prepare transformation context with mapping configuration
             transformation_context = {
-                "source_format": state["mapping_config"].source_format,
-                "target_format": state["mapping_config"].target_format,
-                "target_schema": None
+                "mapping_config": mapping_config,
+                "record_type": record_type
             }
             
-            # Use TransformationAgent to convert data format
+            # Use TransformationAgent for LLM-based transformation
             result = await self.transformer.process(state["mapped_data"], transformation_context)
             
             if result.success:
                 # Store transformed data and update progress
                 state["transformed_data"] = result.data
                 state["completed_steps"].append("transform_data")
-                state["progress"] = 80.0
+                state["progress"] = 75.0
                 state["current_step"] = "data_transformed"
                 
                 # Collect any warnings from transformation
@@ -784,7 +532,7 @@ class MigrationWorkflow:
                 },
                 "data_pipeline": {
                     "file_data": state["file_data"],
-                    "validated_data": state["validated_data"],
+
                     "mapped_data": state["mapped_data"],
                     "transformed_data": state["transformed_data"],
                     "api_results": state["api_results"]
@@ -867,7 +615,6 @@ class MigrationWorkflow:
     async def run(
         self,
         file_path: str,
-        mapping_config: FieldMappingConfig,
         record_type: str = "disability",
         target_system: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
@@ -899,11 +646,11 @@ class MigrationWorkflow:
             # Prepare initial workflow state with all required parameters
             initial_state: MigrationState = {
                 "file_path": file_path,
-                "mapping_config": mapping_config,
+                "mapping_config": None,  # Mapping config will be selected by LLM agent
                 "record_type": record_type,
                 "target_system": target_system or {},
                 "file_data": None,
-                "validated_data": None,
+
                 "mapped_data": None,
                 "transformed_data": None,
                 "api_results": None,
@@ -967,7 +714,7 @@ class MigrationWorkflow:
         """
         # Close all specialized agents in the workflow
         await self.file_reader.close()
-        await self.validator.close()
+
         await self.mapper.close()
         await self.transformer.close()
         await self.api_integrator.close()

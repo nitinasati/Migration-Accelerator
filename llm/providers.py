@@ -173,12 +173,32 @@ class MockLLMProvider(BaseLLMProvider):
             self.callback_handler.on_llm_start({}, [prompt])
             
             # Simple mock response based on prompt content
-            if "validate" in prompt.lower():
-                response = "Data validation completed successfully. All required fields are present."
-            elif "map" in prompt.lower():
-                response = "Data mapping completed. Fields have been transformed according to the mapping rules."
+            if "file" in prompt.lower() and "read" in prompt.lower():
+                response = """{
+                    "success": true,
+                    "data": [
+                        {"policy_number": "POL123456", "employee_id": "EMP001234", "status": "active"},
+                        {"policy_number": "POL789012", "employee_id": "EMP005678", "status": "pending"}
+                    ],
+                    "metadata": {"format": "csv", "records_count": 2}
+                }"""
+            elif "map" in prompt.lower() and "select" in prompt.lower():
+                response = """{
+                    "selected_mapping": "disability_mapping",
+                    "record_type": "disability",
+                    "confidence": 0.95
+                }"""
             elif "transform" in prompt.lower():
-                response = "Data transformation completed. Data has been converted to target format."
+                response = """{
+                    "success": true,
+                    "transformed_data": [
+                        {"policyId": "POL123456", "employeeId": "EMP001234", "policyStatus": "ACTIVE"},
+                        {"policyId": "POL789012", "employeeId": "EMP005678", "policyStatus": "PENDING"}
+                    ],
+                    "metadata": {"transformation_type": "llm", "records_processed": 2}
+                }"""
+            elif "validate" in prompt.lower():
+                response = "Data validation completed successfully. All required fields are present."
             elif "api" in prompt.lower():
                 response = "API integration completed successfully. Data has been sent to target system."
             else:
@@ -575,13 +595,24 @@ class LLMProviderFactory:
         
         try:
             return provider_class(config, agent_name)
-        except ImportError:
+        except ImportError as e:
             # Fall back to mock provider if specific provider package is not available
-            cls.logger = structlog.get_logger()
-            cls.logger.warning(
+            logger = structlog.get_logger()
+            logger.warning(
                 f"Provider {config.provider} not available, using mock provider",
                 provider=config.provider.value,
-                agent=agent_name
+                agent=agent_name,
+                error=str(e)
+            )
+            return MockLLMProvider(config, agent_name)
+        except Exception as e:
+            # Fall back to mock provider for any other error
+            logger = structlog.get_logger()
+            logger.warning(
+                f"Provider {config.provider} failed to initialize, using mock provider",
+                provider=config.provider.value,
+                agent=agent_name,
+                error=str(e)
             )
             return MockLLMProvider(config, agent_name)
     

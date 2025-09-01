@@ -117,7 +117,7 @@ class MigrationSettings(BaseSettings):
     
     # LLM Configuration
     llm_provider: LLMProvider = Field(default=LLMProvider.OPENAI, description="Default LLM provider")
-    llm_model: str = Field(default="gpt-4", description="Default LLM model")
+    llm_model: str = Field(default="gpt-4o-mini", description="Default LLM model")
     llm_temperature: float = Field(default=0.1, description="Default LLM temperature")
     llm_max_tokens: int = Field(default=4000, description="Default max tokens")
     
