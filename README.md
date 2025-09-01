@@ -51,6 +51,45 @@ cp env.example .env
 
 ## ⚙️ Configuration
 
+### Database Setup (Required for State Persistence)
+
+The platform now supports PostgreSQL-based state persistence for LangGraph workflows. This enables:
+
+- **State Recovery**: Resume workflows from any point if interrupted
+- **Audit Trail**: Complete history of all migration runs
+- **Checkpoints**: Save workflow states at critical points
+- **Performance Monitoring**: Track timing and progress metrics
+
+#### 1. PostgreSQL Requirements
+
+- PostgreSQL 12+ running on `localhost:8810`
+- Database named `migration`
+- User `postgres` with appropriate permissions
+
+#### 2. Environment Variables
+
+Add these to your `.env` file:
+
+```bash
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=8810
+DB_NAME=migration
+DB_USER=postgres
+DB_PASSWORD=your_password_here
+DB_SCHEMA=public
+```
+
+#### 3. Database Setup Commands
+
+```bash
+# Set up database tables and schema
+python main.py db-setup
+
+# Verify database connection
+python main.py db-status
+```
+
 ### Environment Variables
 
 ```bash
@@ -140,13 +179,17 @@ print(f"Migration completed: {result['migration_summary']['success']}")
 
 ```bash
 # Validate configuration
-python main.py validate config/mappings/disability_mapping.yaml
+python main.py validate data/input/sample_disability_data.csv
 
 # Check platform status
 python main.py status
 
 # Run tests
 python main.py test
+
+# Database management
+python main.py db-setup      # Set up database tables
+python main.py db-status     # Check database connection
 
 # View logs in LangSmith
 python main.py logs --project migration-accelerators

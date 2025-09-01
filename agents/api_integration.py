@@ -25,6 +25,10 @@ class APIIntegrationAgent(BaseAgent):
     - Monitoring API performance and health
     """
     
+    # Constants
+    DEFAULT_CONTENT_TYPE = "application/json"
+    MCP_MANAGER_UNAVAILABLE = "MCP manager not available"
+    
     def __init__(
         self,
         llm_config: Optional[LLMConfig] = None,
@@ -61,31 +65,31 @@ class APIIntegrationAgent(BaseAgent):
             "disability_policy": {
                 "url": "/api/v1/policies/disability",
                 "method": "POST",
-                "content_type": "application/json",
+                "content_type": self.DEFAULT_CONTENT_TYPE,
                 "authentication": "bearer_token"
             },
             "absence_record": {
                 "url": "/api/v1/absences",
                 "method": "POST",
-                "content_type": "application/json",
+                "content_type": self.DEFAULT_CONTENT_TYPE,
                 "authentication": "bearer_token"
             },
             "group_policy": {
                 "url": "/api/v1/policies/group",
                 "method": "POST",
-                "content_type": "application/json",
+                "content_type": self.DEFAULT_CONTENT_TYPE,
                 "authentication": "bearer_token"
             },
             "employee": {
                 "url": "/api/v1/employees",
                 "method": "POST",
-                "content_type": "application/json",
+                "content_type": self.DEFAULT_CONTENT_TYPE,
                 "authentication": "bearer_token"
             },
             "claim": {
                 "url": "/api/v1/claims",
                 "method": "POST",
-                "content_type": "application/json",
+                "content_type": self.DEFAULT_CONTENT_TYPE,
                 "authentication": "bearer_token"
             }
         }
@@ -105,7 +109,7 @@ class APIIntegrationAgent(BaseAgent):
             self.logger.info("Starting API integration process", data_type=type(data).__name__)
             
             # Validate input
-            if not await self.validate_input(data):
+            if not self.validate_input(data):
                 return AgentResult(
                     success=False,
                     errors=["Invalid input data for API integration"]
@@ -294,12 +298,12 @@ class APIIntegrationAgent(BaseAgent):
             # Prepare request
             url = f"{base_url}{endpoint_config['url']}"
             method = endpoint_config.get("method", "POST")
-            content_type = endpoint_config.get("content_type", "application/json")
+            content_type = endpoint_config.get("content_type", self.DEFAULT_CONTENT_TYPE)
             
             # Prepare headers
             headers = {
                 "Content-Type": content_type,
-                "Accept": "application/json"
+                "Accept": self.DEFAULT_CONTENT_TYPE
             }
             
             # Add authentication
@@ -328,7 +332,7 @@ class APIIntegrationAgent(BaseAgent):
             else:
                 return {
                     "success": False,
-                    "error": "MCP manager not available"
+                    "error": self.MCP_MANAGER_UNAVAILABLE
                 }
                 
         except Exception as e:
@@ -507,7 +511,7 @@ class APIIntegrationAgent(BaseAgent):
         else:
             return {
                 "success": False,
-                "error": "MCP manager not available"
+                "error": self.MCP_MANAGER_UNAVAILABLE
             }
     
     async def health_check(self) -> bool:
@@ -536,14 +540,14 @@ class APIIntegrationAgent(BaseAgent):
             if not self.mcp_manager:
                 return {
                     "success": False,
-                    "error": "MCP manager not available"
+                    "error": self.MCP_MANAGER_UNAVAILABLE
                 }
             
             # Make health check request
             response = await self.mcp_manager.make_api_call(
                 method="GET",
                 url=f"{base_url}/health",
-                headers={"Accept": "application/json"}
+                headers={"Accept": self.DEFAULT_CONTENT_TYPE}
             )
             
             return {
@@ -564,7 +568,7 @@ class APIIntegrationAgent(BaseAgent):
         name: str,
         url: str,
         method: str = "POST",
-        content_type: str = "application/json",
+        content_type: str = DEFAULT_CONTENT_TYPE,
         authentication: str = "bearer_token"
     ) -> None:
         """

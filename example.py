@@ -33,12 +33,10 @@ async def example_migration():
     # Initialize LLM provider
     try:
         llm_config = settings.get_llm_config()
-        llm_provider = LLMProviderFactory.create(llm_config)
         print("   ✓ LLM provider initialized")
     except Exception as e:
         print(f"   ⚠ LLM provider not available: {e}")
         print("   Running without LLM enhancements")
-        llm_provider = None
     
     # Initialize MCP manager
     try:
@@ -184,9 +182,8 @@ async def example_absence_migration():
         return
     
     try:
-        # Load mapping configuration
-        mapping_config = load_mapping_config(mapping_file)
-        print(f"   ✓ Absence mapping configuration loaded")
+        # Mapping configuration is handled automatically by LLM agent
+        print("✓ Using LLM-powered intelligent mapping for absence records")
         
         # Initialize workflow
         llm_config = settings.get_llm_config()
@@ -196,7 +193,6 @@ async def example_absence_migration():
         # Run migration
         result = await workflow.run(
             file_path=input_file,
-            mapping_config=mapping_config,
             record_type="absence"
         )
         

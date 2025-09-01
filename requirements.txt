@@ -29,6 +29,10 @@ requests>=2.31.0
 # Async and Concurrency
 aiofiles>=23.2.1
 
+# Database dependencies for PostgreSQL memory store
+asyncpg>=0.29.0
+psycopg2-binary>=2.9.0
+
 
 
 # Testing

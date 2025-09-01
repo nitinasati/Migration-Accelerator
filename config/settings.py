@@ -140,6 +140,14 @@ class MigrationSettings(BaseSettings):
     mcp_timeout: int = Field(default=30, description="MCP timeout")
     mcp_max_retries: int = Field(default=3, description="MCP max retries")
     
+    # Database Configuration
+    db_host: str = Field(default="localhost", description="Database host")
+    db_port: int = Field(default=8810, description="Database port")
+    db_name: str = Field(default="migration", description="Database name")
+    db_user: str = Field(default="postgres", description="Database username")
+    db_password: Optional[str] = Field(None, description="Database password")
+    db_schema: str = Field(default="public", description="Database schema")
+    
     # File Processing
     max_file_size_mb: int = Field(default=100, description="Maximum file size in MB")
     chunk_size: int = Field(default=1000, description="Processing chunk size")

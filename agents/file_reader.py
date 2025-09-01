@@ -59,7 +59,7 @@ class FileReaderAgent(BaseAgent):
             self.logger.info("Starting file reading process", data_type=type(data).__name__)
             
             # Validate input
-            if not await self.validate_input(data):
+            if not self.validate_input(data):
                 return AgentResult(
                     success=False,
                     errors=["Invalid input data for file reading"]
@@ -110,16 +110,18 @@ class FileReaderAgent(BaseAgent):
             
             for encoding in encodings:
                 try:
-                    with open(file_path, 'r', encoding=encoding) as file:
-                        content = file.read()
+                    import aiofiles
+                    async with aiofiles.open(file_path, 'r', encoding=encoding) as file:
+                        content = await file.read()
                     self.logger.info("File content read successfully", encoding=encoding)
                     return content
                 except UnicodeDecodeError:
                     continue
             
             # If all encodings fail, read as binary and decode with errors='replace'
-            with open(file_path, 'r', encoding='utf-8', errors='replace') as file:
-                content = file.read()
+            import aiofiles
+            async with aiofiles.open(file_path, 'r', encoding='utf-8', errors='replace') as file:
+                content = await file.read()
             self.logger.warning("File read with encoding errors replaced")
             return content
             

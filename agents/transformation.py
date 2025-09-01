@@ -57,7 +57,7 @@ class TransformationAgent(BaseAgent):
             self.logger.info("Starting transformation process", data_type=type(data).__name__)
             
             # Validate input
-            if not await self.validate_input(data):
+            if not self.validate_input(data):
                 return AgentResult(
                     success=False,
                     errors=["Invalid input data for transformation"]

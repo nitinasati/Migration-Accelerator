@@ -168,6 +168,87 @@ def test():
         raise typer.Exit(1)
 
 
+@app.command()
+def db_setup():
+    """Set up the PostgreSQL database for LangGraph memory persistence."""
+    
+    console.print(Panel.fit(
+        "[bold blue]Database Setup[/bold blue]\n"
+        "Setting up PostgreSQL database for LangGraph state persistence",
+        border_style="blue"
+    ))
+    
+    try:
+        # Run the database setup script
+        import subprocess
+        import sys
+        
+        script_path = "scripts/create_tables.py"
+        if not os.path.exists(script_path):
+            console.print(f"[red]Error: Database setup script not found: {script_path}[/red]")
+            raise typer.Exit(1)
+        
+        console.print("Running database setup script...")
+        result = subprocess.run([sys.executable, script_path], capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            console.print("[green]✓ Database setup completed successfully![/green]")
+            console.print(result.stdout)
+        else:
+            console.print("[red]✗ Database setup failed[/red]")
+            console.print(f"Error: {result.stderr}")
+            raise typer.Exit(1)
+            
+    except Exception as e:
+        console.print(f"[red]Error setting up database: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def db_status():
+    """Check the status of the PostgreSQL database."""
+    
+    console.print(Panel.fit(
+        "[bold blue]Database Status[/bold blue]",
+        border_style="blue"
+    ))
+    
+    try:
+        from config.database import get_database_config
+        from memory import PostgresMemoryManager
+        import asyncio
+        
+        config = get_database_config()
+        console.print("Database Configuration:")
+        console.print(f"  Host: {config.host}")
+        console.print(f"  Port: {config.port}")
+        console.print(f"  Database: {config.database}")
+        console.print(f"  Username: {config.username}")
+        console.print("  Password: *******")
+        console.print(f"  Schema: {config.schema}")
+        
+        # Test connection
+        async def test_connection():
+            try:
+                memory_manager = PostgresMemoryManager(config)
+                await memory_manager.initialize()
+                await memory_manager.close()
+                return True
+            except Exception as e:
+                return str(e)
+        
+        result = asyncio.run(test_connection())
+        
+        if result is True:
+            console.print("[green]✓ Database connection successful[/green]")
+        else:
+            console.print(f"[red]✗ Database connection failed: {result}[/red]")
+            
+    except Exception as e:
+        console.print(f"[red]Error checking database status: {e}[/red]")
+        raise typer.Exit(1)
+
+
 
 
 

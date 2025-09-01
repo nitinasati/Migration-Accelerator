@@ -100,8 +100,8 @@ def _configure_langsmith() -> None:
             import langsmith
             from langsmith import Client
             
-            # Initialize LangSmith client
-            client = Client(
+            # Initialize LangSmith client (configured via environment variables)
+            Client(
                 api_key=langsmith_config.api_key,
                 api_url=langsmith_config.endpoint
             )

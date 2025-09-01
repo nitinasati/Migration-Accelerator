@@ -97,7 +97,7 @@ class BaseAgent(ABC):
         """
         pass
     
-    async def validate_input(self, data: Any) -> bool:
+    def validate_input(self, data: Any) -> bool:
         """
         Validate input data before processing.
         

@@ -16,6 +16,8 @@ from agents.mapping import MappingAgent
 from agents.transformation import TransformationAgent
 from agents.api_integration import APIIntegrationAgent
 from config.settings import LLMConfig, MCPConfig
+from config.database import get_database_config
+from memory import PostgresMemoryManager
 from llm.providers import initialize_langsmith
 
 
@@ -57,6 +59,7 @@ class MigrationState(TypedDict):
     mapping_config: Optional[Any]  # Will be selected by LLM agent
     record_type: str
     target_system: Dict[str, Any]
+    run_id: Optional[str]  # Database run ID for state persistence
     
     # Workflow data
     file_data: Optional[List[Dict[str, Any]]]
@@ -124,6 +127,10 @@ class MigrationWorkflow:
         self.llm_config = llm_config
         self.mcp_config = mcp_config
         self.logger = structlog.get_logger().bind(component="migration_workflow")
+        
+        # Initialize database and memory
+        self.db_config = get_database_config()
+        self.memory_manager: Optional[PostgresMemoryManager] = None
         
         # Initialize LangSmith tracing
         initialize_langsmith()
@@ -243,9 +250,22 @@ class MigrationWorkflow:
         """
         self.logger.info("Initializing migration workflow")
         
+        # Initialize memory manager
+        self.memory_manager = PostgresMemoryManager(self.db_config)
+        await self.memory_manager.initialize()
+        
+        # Create migration run in database
+        memory_store = self.memory_manager.get_memory_store()
+        run_id = await memory_store.create_migration_run(
+            file_path=state["file_path"],
+            record_type=state["record_type"]
+        )
+        
+        # Store run ID in state for reference
+        state["run_id"] = run_id
+        
         # Initialize all specialized agents for the workflow steps
         await self.file_reader.initialize()
-
         await self.mapper.initialize()
         await self.transformer.initialize()
         await self.api_integrator.initialize()
@@ -258,7 +278,14 @@ class MigrationWorkflow:
         state["progress"] = 0.0
         state["success"] = False
         
-        self.logger.info("Workflow initialized")
+        # Save state to database
+        await memory_store.save_state(
+            step_name="initialization",
+            state=state,
+            metadata={"progress": 0.0, "step": "initialization"}
+        )
+        
+        self.logger.info("Workflow initialized", run_id=run_id)
         return state
     
     async def _read_file_node(self, state: MigrationState) -> MigrationState:
@@ -295,11 +322,29 @@ class MigrationWorkflow:
                 state["progress"] = 25.0
                 state["current_step"] = "file_read"
                 
+                # Save state to database
+                if self.memory_manager:
+                    memory_store = self.memory_manager.get_memory_store()
+                    await memory_store.save_state(
+                        step_name="read_file",
+                        state=state,
+                        metadata={"progress": 25.0, "step": "read_file", "records_count": len(result.data) if isinstance(result.data, list) else 1}
+                    )
+                
                 self.logger.info("File read successfully", records_count=len(result.data) if isinstance(result.data, list) else 1)
             else:
                 # Record errors and update state for error handling
                 state["errors"].extend(result.errors)
                 state["current_step"] = "file_read_error"
+                
+                # Save error state to database
+                if self.memory_manager:
+                    memory_store = self.memory_manager.get_memory_store()
+                    await memory_store.save_state(
+                        step_name="read_file_error",
+                        state=state,
+                        metadata={"progress": 25.0, "step": "read_file_error", "errors": result.errors}
+                    )
                 
                 self.logger.error("File reading failed", errors=result.errors)
             
@@ -354,11 +399,29 @@ class MigrationWorkflow:
                 if result.warnings:
                     state["warnings"].extend(result.warnings)
                 
+                # Save state to database
+                if self.memory_manager:
+                    memory_store = self.memory_manager.get_memory_store()
+                    await memory_store.save_state(
+                        step_name="map_data",
+                        state=state,
+                        metadata={"progress": 50.0, "step": "map_data", "mapping_metadata": result.metadata}
+                    )
+                
                 self.logger.info("Data mapping successful")
             else:
                 # Record mapping errors
                 state["errors"].extend(result.errors)
                 state["current_step"] = "mapping_error"
+                
+                # Save error state to database
+                if self.memory_manager:
+                    memory_store = self.memory_manager.get_memory_store()
+                    await memory_store.save_state(
+                        step_name="map_data_error",
+                        state=state,
+                        metadata={"progress": 50.0, "step": "map_data_error", "errors": result.errors}
+                    )
                 
                 self.logger.error("Data mapping failed", errors=result.errors)
             
@@ -424,11 +487,29 @@ class MigrationWorkflow:
                 if result.warnings:
                     state["warnings"].extend(result.warnings)
                 
+                # Save state to database
+                if self.memory_manager:
+                    memory_store = self.memory_manager.get_memory_store()
+                    await memory_store.save_state(
+                        step_name="transform_data",
+                        state=state,
+                        metadata={"progress": 75.0, "step": "transform_data"}
+                    )
+                
                 self.logger.info("Data transformation successful")
             else:
                 # Record transformation errors
                 state["errors"].extend(result.errors)
                 state["current_step"] = "transformation_error"
+                
+                # Save error state to database
+                if self.memory_manager:
+                    memory_store = self.memory_manager.get_memory_store()
+                    await memory_store.save_state(
+                        step_name="transform_data_error",
+                        state=state,
+                        metadata={"progress": 75.0, "step": "transform_data_error", "errors": result.errors}
+                    )
                 
                 self.logger.error("Data transformation failed", errors=result.errors)
             
@@ -488,11 +569,29 @@ class MigrationWorkflow:
                 if result.warnings:
                     state["warnings"].extend(result.warnings)
                 
+                # Save state to database
+                if self.memory_manager:
+                    memory_store = self.memory_manager.get_memory_store()
+                    await memory_store.save_state(
+                        step_name="integrate_api",
+                        state=state,
+                        metadata={"progress": 100.0, "step": "integrate_api"}
+                    )
+                
                 self.logger.info("API integration successful")
             else:
                 # Record API integration errors
                 state["errors"].extend(result.errors)
                 state["current_step"] = "api_integration_error"
+                
+                # Save error state to database
+                if self.memory_manager:
+                    memory_store = self.memory_manager.get_memory_store()
+                    await memory_store.save_state(
+                        step_name="integrate_api_error",
+                        state=state,
+                        metadata={"progress": 100.0, "step": "integrate_api_error", "errors": result.errors}
+                    )
                 
                 self.logger.error("API integration failed", errors=result.errors)
             
@@ -545,6 +644,45 @@ class MigrationWorkflow:
             state["final_result"] = final_result
             state["success"] = len(state["errors"]) == 0
             state["current_step"] = "completed"
+            
+            # Update migration run status in database
+            if self.memory_manager and state.get("run_id"):
+                memory_store = self.memory_manager.get_memory_store()
+                
+                # Calculate total duration
+                start_time = state.get("start_time")
+                end_time = datetime.now()
+                total_duration = None
+                if start_time:
+                    if isinstance(start_time, str):
+                        start_time = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+                    elif isinstance(start_time, float):
+                        # Convert float timestamp to datetime
+                        start_time = datetime.fromtimestamp(start_time)
+                    total_duration = (end_time - start_time).total_seconds()
+                
+                # Update run status
+                await memory_store.update_migration_run_status(
+                    run_id=state["run_id"],
+                    status="completed" if state["success"] else "failed",
+                    success=state["success"],
+                    total_duration=total_duration,
+                    error_message="; ".join(state["errors"]) if state["errors"] else None
+                )
+                
+                # Save final state to database
+                await memory_store.save_state(
+                    step_name="finalize",
+                    state=state,
+                    metadata={"progress": 100.0, "step": "finalize", "success": state["success"]}
+                )
+                
+                # Save checkpoint for potential resume
+                await memory_store.save_checkpoint(
+                    checkpoint_name="final",
+                    state=state,
+                    metadata={"final_state": True, "success": state["success"]}
+                )
             
             self.logger.info("Migration workflow finalized", success=state["success"])
             
@@ -649,9 +787,10 @@ class MigrationWorkflow:
                 "mapping_config": None,  # Mapping config will be selected by LLM agent
                 "record_type": record_type,
                 "target_system": target_system or {},
+                "run_id": None,  # Will be set during initialization
                 "file_data": None,
-
                 "mapped_data": None,
+                "mapping_metadata": None,
                 "transformed_data": None,
                 "api_results": None,
                 "current_step": "initialization",
@@ -712,9 +851,12 @@ class MigrationWorkflow:
         resources. It should be called after workflow completion to ensure
         proper resource management.
         """
+        # Close memory manager
+        if self.memory_manager:
+            await self.memory_manager.close()
+        
         # Close all specialized agents in the workflow
         await self.file_reader.close()
-
         await self.mapper.close()
         await self.transformer.close()
         await self.api_integrator.close()
