@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Migrations - Migration-Accelerators{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="display-5 mb-4">
+            <i class="bi bi-list-ul text-primary"></i> Migration Runs
+        </h1>
+    </div>
+</div>
+
+<!-- Statistics Row -->
+{% if stats %}
+<div class="row mb-4">
+    <div class="col-md-2 mb-3">
+        <div class="card bg-primary text-white text-center">
+            <div class="card-body">
+                <h4>{{ stats.total_runs or 0 }}</h4>
+                <small>Total</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2 mb-3">
+        <div class="card bg-success text-white text-center">
+            <div class="card-body">
+                <h4>{{ stats.completed_runs or 0 }}</h4>
+                <small>Completed</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2 mb-3">
+        <div class="card bg-warning text-white text-center">
+            <div class="card-body">
+                <h4>{{ stats.running_runs or 0 }}</h4>
+                <small>Running</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2 mb-3">
+        <div class="card bg-danger text-white text-center">
+            <div class="card-body">
+                <h4>{{ stats.failed_runs or 0 }}</h4>
+                <small>Failed</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2 mb-3">
+        <div class="card bg-info text-white text-center">
+            <div class="card-body">
+                <h4>{{ "%.1f"|format(stats.success_rate or 0) }}%</h4>
+                <small>Success Rate</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2 mb-3">
+        <div class="card bg-secondary text-white text-center">
+            <div class="card-body">
+                <h4>{{ "%.1f"|format(stats.avg_duration or 0) }}s</h4>
+                <small>Avg Duration</small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Filters -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-funnel"></i> Filters
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('migrations') }}" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="record_type" class="form-label">Record Type</label>
+                        <select class="form-select" id="record_type" name="record_type">
+                            <option value="">All Types</option>
+                            <option value="disability" {% if filters.record_type == 'disability' %}selected{% endif %}>Disability</option>
+                            <option value="absence" {% if filters.record_type == 'absence' %}selected{% endif %}>Absence</option>
+                            <option value="group_policy" {% if filters.record_type == 'group_policy' %}selected{% endif %}>Group Policy</option>
+                            <option value="employee" {% if filters.record_type == 'employee' %}selected{% endif %}>Employee</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="file_path" class="form-label">File Path</label>
+                        <input type="text" class="form-control" id="file_path" name="file_path" 
+                               value="{{ filters.file_path or '' }}" placeholder="Search file path...">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="status" class="form-label">Status</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="">All Statuses</option>
+                            <option value="running" {% if filters.status == 'running' %}selected{% endif %}>Running</option>
+                            <option value="completed" {% if filters.status == 'completed' %}selected{% endif %}>Completed</option>
+                            <option value="failed" {% if filters.status == 'failed' %}selected{% endif %}>Failed</option>
+                            <option value="paused" {% if filters.status == 'paused' %}selected{% endif %}>Paused</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="bi bi-search"></i> Filter
+                        </button>
+                        <a href="{{ url_for('migrations') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle"></i> Clear
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Migrations Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-table"></i> Migration Runs
+                </h5>
+                <span class="badge bg-primary">{{ migrations|length }} results</span>
+            </div>
+            <div class="card-body">
+                {% if migrations %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>File Path</th>
+                                <th>Record Type</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Duration</th>
+                                <th>Success</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for migration in migrations %}
+                            <tr>
+                                <td>
+                                    <span class="text-truncate d-inline-block" style="max-width: 200px;" title="{{ migration.file_path }}">
+                                        {{ migration.file_path }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ migration.record_type }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ migration.status | status_badge }}">{{ migration.status }}</span>
+                                </td>
+                                <td>{{ migration.created_at | datetime }}</td>
+                                <td>{{ format_duration(migration.total_duration) }}</td>
+                                <td>
+                                    {% if migration.success is not none %}
+                                        {% if migration.success %}
+                                            <i class="bi bi-check-circle text-success"></i>
+                                        {% else %}
+                                            <i class="bi bi-x-circle text-danger"></i>
+                                        {% endif %}
+                                    {% else %}
+                                        <i class="bi bi-dash-circle text-muted"></i>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('migration_detail', run_id=migration.id) }}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> View Details
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox display-1 text-muted"></i>
+                    <h4 class="text-muted mt-3">No migrations found</h4>
+                    <p class="text-muted">Try adjusting your filters or check if there are any migrations in the system.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Migration-Accelerators{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="display-4 mb-4">
+            <i class="bi bi-speedometer2 text-primary"></i> Migration Dashboard
+        </h1>
+        <p class="lead text-muted">
+            Monitor and visualize your data migration workflows in real-time
+        </p>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4" id="stats-cards">
+    <div class="col-md-3 mb-3">
+        <div class="card bg-primary text-white h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-list-ul display-6"></i>
+                <h3 class="card-title" id="total-runs">-</h3>
+                <p class="card-text">Total Migrations</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card bg-success text-white h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-check-circle display-6"></i>
+                <h3 class="card-title" id="completed-runs">-</h3>
+                <p class="card-text">Completed</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card bg-warning text-white h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-play-circle display-6"></i>
+                <h3 class="card-title" id="running-runs">-</h3>
+                <p class="card-text">Running</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card bg-danger text-white h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-x-circle display-6"></i>
+                <h3 class="card-title" id="failed-runs">-</h3>
+                <p class="card-text">Failed</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-lightning"></i> Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <a href="{{ url_for('migrations') }}" class="btn btn-primary btn-lg w-100">
+                            <i class="bi bi-list-ul"></i> View All Migrations
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <a href="{{ url_for('search') }}" class="btn btn-outline-primary btn-lg w-100">
+                            <i class="bi bi-search"></i> Search Migrations
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <a href="{{ url_for('migrations', status='running') }}" class="btn btn-warning btn-lg w-100">
+                            <i class="bi bi-play-circle"></i> Monitor Running
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Migrations Table -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="bi bi-clock-history"></i> Recent Migrations
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Migration ID</th>
+                        <th>File Path</th>
+                        <th>Record Type</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Duration</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="recent-migrations-table">
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">
+                            <i class="bi bi-hourglass-split"></i> Loading recent migrations...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Dashboard functionality
+    async function loadDashboard() {
+        console.log('loadDashboard function called');
+        
+        try {
+            // Load statistics
+            console.log('Loading statistics...');
+            const statsResponse = await fetch('/api/migrations/stats');
+            const stats = await statsResponse.json();
+            console.log('Statistics loaded:', stats);
+            
+            // Update statistics cards with null checks
+            const totalRunsElement = document.getElementById('total-runs');
+            const completedRunsElement = document.getElementById('completed-runs');
+            const runningRunsElement = document.getElementById('running-runs');
+            const failedRunsElement = document.getElementById('failed-runs');
+            const recent24hElement = document.getElementById('recent-24h');
+            
+            if (totalRunsElement) totalRunsElement.textContent = stats.total_migrations || 0;
+            if (completedRunsElement) completedRunsElement.textContent = stats.status_breakdown?.completed || 0;
+            if (runningRunsElement) runningRunsElement.textContent = stats.status_breakdown?.running || 0;
+            if (failedRunsElement) failedRunsElement.textContent = stats.status_breakdown?.failed || 0;
+            if (recent24hElement) recent24hElement.textContent = stats.recent_24h || 0;
+            
+            // Load recent migrations
+            console.log('Loading recent migrations...');
+            const migrationsResponse = await fetch('/api/migrations?limit=5');
+            const migrations = await migrationsResponse.json();
+            console.log('Recent migrations loaded:', migrations);
+            
+            const recentMigrationsTable = document.getElementById('recent-migrations-table');
+            console.log('Found table body element:', recentMigrationsTable);
+            
+            if (recentMigrationsTable && migrations.length > 0) {
+                console.log('Updating table body with', migrations.length, 'migrations');
+                // Clear only the table body, preserving headers
+                recentMigrationsTable.innerHTML = '';
+                
+                // Add each migration as a row
+                migrations.forEach(migration => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>
+                            <a href="/migrations/${migration.id}" class="text-decoration-none">
+                                ${migration.id.substring(0, 8)}...
+                            </a>
+                        </td>
+                        <td>${migration.file_path || 'N/A'}</td>
+                        <td>${migration.record_type || 'N/A'}</td>
+                        <td>
+                            <span class="badge bg-${getStatusBadgeClass(migration.status)}">
+                                ${migration.status || 'N/A'}
+                            </span>
+                        </td>
+                        <td>${formatDateTime(migration.created_at)}</td>
+                        <td>${formatDuration(migration.total_duration)}</td>
+                        <td>
+                            <a href="/migrations/${migration.id}" class="btn btn-sm btn-primary">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                        </td>
+                    `;
+                    recentMigrationsTable.appendChild(row);
+                });
+            } else if (recentMigrationsTable) {
+                console.log('No migrations found, showing empty message');
+                // Show "no migrations" message in table body only
+                recentMigrationsTable.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">
+                            <i class="bi bi-inbox"></i> No migrations found
+                        </td>
+                    </tr>
+                `;
+            } else {
+                console.error('Recent migrations table body element not found');
+            }
+        } catch (error) {
+            console.error('Error loading dashboard:', error);
+        }
+    }
+    
+    // Helper function to get status badge class
+    function getStatusBadgeClass(status) {
+        const statusMap = {
+            'running': 'warning',
+            'completed': 'success',
+            'failed': 'danger',
+            'paused': 'info'
+        };
+        return statusMap[status?.toLowerCase()] || 'secondary';
+    }
+    
+    // Helper function to format datetime
+    function formatDateTime(datetimeStr) {
+        if (!datetimeStr) return 'N/A';
+        try {
+            const dt = new Date(datetimeStr);
+            return dt.toLocaleString();
+        } catch {
+            return datetimeStr;
+        }
+    }
+    
+    // Helper function to format duration
+    function formatDuration(duration) {
+        if (duration === null || duration === undefined) return 'N/A';
+        try {
+            const dur = parseFloat(duration);
+            if (dur < 60) {
+                return `${dur.toFixed(1)}s`;
+            } else if (dur < 3600) {
+                return `${(dur / 60).toFixed(1)}m`;
+            } else {
+                return `${(dur / 3600).toFixed(1)}h`;
+            }
+        } catch {
+            return 'N/A';
+        }
+    }
+    
+    // Load dashboard when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOMContentLoaded event fired');
+        loadDashboard();
+    });
+    
+</script>
+{% endblock %}

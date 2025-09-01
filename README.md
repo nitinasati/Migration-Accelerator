@@ -1,452 +1,328 @@
-# Migration-Accelerator
+# Migration-Accelerators Platform
 
-A modern, LLM-agnostic platform for accelerating data migration projects using Agentic AI, Google's A2A framework, LangGraph, and MCP. This platform leverages intelligent agents to automate complex migration workflows across various domains and data formats.
+A comprehensive platform for intelligent data migration from legacy systems to modern platforms using AI-powered agents and workflow orchestration.
 
 ## 🚀 Features
 
-- **Agentic AI Architecture**: Multi-agent system that autonomously handles complex migration tasks
-- **A2A Framework Integration**: Leverages Google's Agent-to-Agent framework for intelligent agent coordination
-- **LLM Agnostic**: Support for OpenAI, AWS Bedrock, Anthropic, and Google Vertex AI
-- **LangGraph Workflows**: Complex multi-agent workflows with state management
-- **MCP Integration**: Model Context Protocol for standardized API interactions
-- **Dynamic Field Mapping**: AI-powered field mapping and transformation from configuration files
-- **Intelligent Validation**: LLM-powered data validation and business rule checking with batch processing
-- **Rich Logging**: LangSmith integration for LLM call tracking and debugging
+### Core Migration Engine
+- **Multi-Agent Architecture**: File Reader, Mapping, Transformation, and API Integration agents
+- **LLM-Powered Intelligence**: AI-driven file parsing, mapping selection, and data transformation
+- **LangGraph Workflows**: Orchestrated migration processes with state persistence
+- **Multiple File Formats**: Support for CSV, Excel, JSON, XML, and Fixed-width files
+- **Real-time Monitoring**: Live progress tracking and error handling
 
-- **Performance Tracking**: Comprehensive timing and performance metrics
-- **Domain Agnostic**: Works across various industries and data formats
+### Web Dashboard & API
+- **Modern Web Interface**: Responsive dashboard built with Flask and Bootstrap 5
+- **RESTful API**: FastAPI-based backend with comprehensive endpoints
+- **Workflow Visualization**: Pizza tracker showing step-by-step migration progress
+- **Advanced Search**: Filter by record type, file path, and status
+- **Real-time Statistics**: Live migration metrics and performance data
+
+### Data Persistence
+- **PostgreSQL Database**: Robust state storage and workflow history
+- **State Management**: Complete workflow state persistence with JSONB support
+- **Checkpoint System**: Workflow recovery and audit trails
+- **Performance Metrics**: Duration tracking and success rate analysis
 
 ## 🏗️ Architecture
 
-The platform uses an Agentic AI architecture with intelligent agents that autonomously handle migration tasks:
+```
+Migration-Accelerators/
+├── agents/              # AI-powered migration agents
+├── workflows/           # LangGraph workflow definitions
+├── llm/                # LLM provider abstractions
+├── config/             # Configuration and settings
+├── memory/             # Database persistence layer
+├── web/                # Web dashboard application
+│   ├── static/         # CSS, JS, and assets
+│   ├── templates/      # HTML templates
+│   └── app.py          # Flask web application
+├── api/                # RESTful API
+│   ├── routes/         # API endpoint definitions
+│   ├── models/         # Data models and validation
+│   └── main.py         # FastAPI application
+└── tests/              # Test suites
+```
 
-### Core Agents
-1. **File Reader Agent** - Intelligently reads and parses various file formats
-2. **Validation Agent** - AI-powered data integrity and business rule validation
-3. **Mapping Agent** - Autonomous field mapping and transformation discovery
-4. **Transformation Agent** - Intelligent data format conversion and optimization
-5. **API Integration Agent** - Manages MCP-based API calls with error recovery
-6. **Orchestration Agent** - Coordinates the entire workflow with adaptive decision making
+## 🚀 Quick Start
 
-### Key Technologies
-- **A2A Framework**: Google's Agent-to-Agent coordination
-- **LangGraph**: Multi-agent workflow orchestration
-- **LangChain**: LLM integration and prompt management
-- **LangSmith**: LLM call logging and debugging
-- **MCP**: Model Context Protocol for API interactions
+### 1. Prerequisites
+- Python 3.8+
+- PostgreSQL 12+
+- Required environment variables (see `.env.template`)
 
-## 📦 Installation
-
+### 2. Installation
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd Migration-Accelerators
+cd Migration-Accelerator
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Set up environment variables
-cp env.example .env
-# Edit .env with your configuration
-
-## ⚙️ Configuration
-
-### Database Setup (Required for State Persistence)
-
-The platform now supports PostgreSQL-based state persistence for LangGraph workflows. This enables:
-
-- **State Recovery**: Resume workflows from any point if interrupted
-- **Audit Trail**: Complete history of all migration runs
-- **Checkpoints**: Save workflow states at critical points
-- **Performance Monitoring**: Track timing and progress metrics
-
-#### 1. PostgreSQL Requirements
-
-- PostgreSQL 12+ running on `localhost:8810`
-- Database named `migration`
-- User `postgres` with appropriate permissions
-
-#### 2. Environment Variables
-
-Add these to your `.env` file:
-
-```bash
-# Database Configuration
-DB_HOST=localhost
-DB_PORT=8810
-DB_NAME=migration
-DB_USER=postgres
-DB_PASSWORD=your_password_here
-DB_SCHEMA=public
-```
-
-#### 3. Database Setup Commands
-
-```bash
-# Set up database tables and schema
+# Set up database
 python main.py db-setup
 
 # Verify database connection
 python main.py db-status
 ```
 
-### Environment Variables
-
+### 3. Run Migration
 ```bash
-# LLM Provider Configuration
-LLM_PROVIDER=openai  # openai, bedrock, anthropic, vertexai
-OPENAI_API_KEY=your_openai_key
-ANTHROPIC_API_KEY=your_anthropic_key
-AWS_ACCESS_KEY_ID=your_aws_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret
-AWS_REGION=us-east-1
+# Execute a migration
+python main.py migrate data/input/sample_disability_data.csv --dry-run
 
-# LangSmith Configuration
-LANGCHAIN_API_KEY=your_langsmith_key
-LANGCHAIN_PROJECT=your_project_name
-LANGCHAIN_TRACING_V2=true
-
-# MCP Configuration
-MCP_SERVER_URL=http://localhost:3000
-MCP_API_KEY=your_mcp_key
-```
-
-### Field Mapping Configuration
-
-Create mapping files in `config/mappings/`:
-
-```yaml
-# config/mappings/disability_mapping.yaml
-source_format: csv
-target_format: json
-record_type: disability
-rules:
-  - source_field: policy_number
-    target_field: policyId
-    transformation_type: direct
-    validation:
-      required: true
-      pattern: "^[A-Z0-9]{6,12}$"
-  
-  - source_field: effective_date
-    target_field: effectiveDate
-    transformation_type: date_format
-    source_format: "%Y-%m-%d"
-    target_format: "ISO8601"
-    validation:
-      required: true
-      future_date: false
-```
-
-## 🚀 Usage
-
-### Basic Migration
-
-```bash
-# Run migration with default configuration
+# Run with real API integration
 python main.py migrate data/input/sample_disability_data.csv
-
-# Run with custom mapping
-python main.py migrate data/input/sample_disability_data.csv --mapping config/mappings/custom_mapping.yaml
-
-# Run in dry-run mode
-python main.py migrate data/input/sample_disability_data.csv --dry-run
 ```
 
-### Advanced Usage
-
-```python
-from workflows.migration_graph import MigrationWorkflow
-from config.settings import LLMConfig, MCPConfig
-
-# Initialize platform
-workflow = MigrationWorkflow(
-    llm_config=LLMConfig(provider="openai", model="gpt-4"),
-    mcp_config=MCPConfig(server_url="http://localhost:3000")
-)
-
-# Run migration
-result = await workflow.run(
-    file_path="data/input/sample_disability_data.csv",
-    mapping_config=mapping_config,
-    record_type="disability"
-)
-
-print(f"Migration completed: {result['migration_summary']['success']}")
-```
-
-### CLI Commands
-
+### 4. Start Web Dashboard
 ```bash
-# Validate configuration
-python main.py validate data/input/sample_disability_data.csv
+# Terminal 1: Start the API
+cd api
+python main.py
 
-# Check platform status
-python main.py status
-
-# Run tests
-python main.py test
-
-# Database management
-python main.py db-setup      # Set up database tables
-python main.py db-status     # Check database connection
-
-# View logs in LangSmith
-python main.py logs --project migration-accelerators
+# Terminal 2: Start the web dashboard
+cd web
+python app.py
 ```
 
+- **API**: http://localhost:8000 (with docs at /docs)
+- **Web Dashboard**: http://localhost:5000
 
+## 🌐 Web Dashboard Features
 
-### Performance Tracking
+### Dashboard Overview
+- Real-time migration statistics
+- Recent migration runs
+- Quick action buttons
+- Auto-refreshing data
 
-The platform provides comprehensive performance monitoring:
+### Migration Management
+- List all migration runs
+- Filter by record type, file path, and status
+- View detailed migration information
+- Export migration data
 
-```bash
-# Run migration with timing information
-python main.py migrate data/input/sample_disability_data.csv --dry-run
+### Workflow Visualization
+- **Pizza Tracker**: Visual workflow progress indicator
+- Step-by-step execution details
+- Progress bars and metadata
+- Workflow state inspection
+
+### Search & Analytics
+- Full-text search across all fields
+- Advanced filtering options
+- Performance metrics and trends
+- Success rate analysis
+
+## 🔌 API Endpoints
+
+### Core Endpoints
+- `GET /api/v1/migrations` - List migrations with filters
+- `GET /api/v1/migrations/{id}` - Get migration details
+- `GET /api/v1/migrations/{id}/states` - Get workflow states
+- `GET /api/v1/migrations/stats` - Get migration statistics
+- `GET /api/v1/migrations/search` - Search migrations
+
+### Query Parameters
+- **Filtering**: `record_type`, `file_path`, `status`
+- **Pagination**: `limit`, `offset`
+- **Search**: `q` (full-text search)
+
+## 🗄️ Database Schema
+
+### Core Tables
+- `migration_runs`: Migration execution records
+- `workflow_states`: Individual workflow step states
+- `workflow_checkpoints`: Workflow recovery points
+- `workflow_metadata`: Additional workflow information
+
+### Key Features
+- **UUID Primary Keys**: Unique identification for all entities
+- **JSONB Support**: Flexible metadata and state storage
+- **Foreign Key Constraints**: Referential integrity
+- **Indexing**: Optimized query performance
+- **Triggers**: Automatic timestamp updates
+
+## 🤖 AI Agents
+
+### File Reader Agent
+- **Intelligent Parsing**: LLM-powered file format detection
+- **Multi-format Support**: CSV, Excel, JSON, XML, Fixed-width
+- **Encoding Handling**: Automatic encoding detection and conversion
+- **Error Recovery**: Graceful handling of malformed files
+
+### Mapping Agent
+- **Smart Selection**: AI-driven mapping configuration selection
+- **Field Analysis**: Automatic field type and relationship detection
+- **Business Logic**: Intelligent transformation rule generation
+- **Validation**: Built-in data quality checks
+
+### Transformation Agent
+- **LLM Processing**: AI-powered data transformation
+- **Type Conversion**: Automatic data type handling
+- **Business Rules**: Application of domain-specific logic
+- **Error Handling**: Comprehensive error reporting
+
+### API Integration Agent
+- **Multiple Modes**: Real API calls or file output
+- **Authentication**: Bearer token, API key, and OAuth2 support
+- **Batch Processing**: Efficient bulk data handling
+- **Retry Logic**: Automatic retry with exponential backoff
+
+## 🔧 Configuration
+
+### Environment Variables
+```env
+# Database
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=migration
+DB_USER=postgres
+DB_PASSWORD=your_password
+
+# LLM Providers
+OPENAI_API_KEY=your_openai_key
+BEDROCK_ACCESS_KEY=your_aws_key
+BEDROCK_SECRET_KEY=your_aws_secret
+
+# LangSmith
+LANGSMITH_API_KEY=your_langsmith_key
+LANGSMITH_PROJECT=your_project_name
 ```
 
-**Performance Metrics:**
-- **Total Duration**: Complete end-to-end migration time
-- **Step Timing**: Individual agent processing times
-- **Start/End Times**: Precise timestamps for migration execution
-- **Progress Tracking**: Real-time progress monitoring
-- **Resource Usage**: Memory and processing efficiency metrics
+### LLM Provider Support
+- **OpenAI**: GPT-3.5, GPT-4 models
+- **AWS Bedrock**: Claude, Llama, and other models
+- **Anthropic**: Claude models
+- **Google**: PaLM and Gemini models
+- **Mock Provider**: Fallback for development
 
-**Sample Output:**
-```
-┏━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Metric             ┃ Value                      ┃
-┡━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ Success            │ ✓ Yes                      │
-│ Records Processed  │ 10                         │
-│ Progress           │ 100.0%                     │
-│ Completed Steps    │ 5                          │
-│ Total Duration     │ 0:00:20                    │
-│ Duration (seconds) │ 20.03s                     │
-│ Start Time         │ 2025-08-31T19:02:02.299400 │
-│ End Time           │ 2025-08-31T19:02:22.333727 │
-└────────────────────┴────────────────────────────┘
-```
+## 📊 Monitoring & Observability
 
-## 🔧 Development
+### LangSmith Integration
+- **LLM Call Tracing**: Monitor all AI model interactions
+- **Workflow Execution**: Track complete migration workflows
+- **Performance Metrics**: Response times and token usage
+- **Error Analysis**: Detailed error tracking and debugging
 
-### Project Structure
-
-```
-├── agents/                 # A2A agents
-│   ├── base_agent.py      # Base agent class
-│   ├── file_reader.py     # File reading agent
-│   ├── validation.py      # Validation agent with batch processing
-│   ├── mapping.py         # Mapping agent
-│   ├── transformation.py  # Transformation agent
-│   └── api_integration.py # API integration agent
-├── workflows/             # LangGraph workflows
-│   └── migration_graph.py # Main migration workflow
-├── llm/                   # LLM provider abstractions
-│   ├── providers.py       # LLM provider factory with LangSmith integration
-│   └── prompts.py         # Prompt templates including batch validation
-├── mcp_tools/             # MCP integration (renamed from mcp/)
-│   └── client.py          # MCP client
-├── config/                # Configuration
-│   ├── settings.py        # Platform settings with timing support
-│   ├── mappings.py        # Mapping utilities
-│   └── mappings/          # Field mapping files
-├── data/                  # Sample data and outputs
-│   ├── input/             # Input data files
-│   └── output/            # Generated output files
-├── tests/                 # Test suite
-├── main.py               # CLI entry point
-├── example.py            # Usage examples
-├── requirements.txt      # Dependencies
-└── README.md             # This file
-```
-
-### Adding New LLM Providers
-
-```python
-from llm.providers import BaseLLMProvider
-
-class CustomLLMProvider(BaseLLMProvider):
-    def __init__(self, config):
-        super().__init__(config)
-    
-    async def generate(self, prompt: str) -> str:
-        # Implement your LLM provider logic
-        pass
-    
-    async def generate_structured(self, prompt: str, schema: dict) -> dict:
-        # Implement structured generation
-        pass
-```
-
-### Creating Custom MCP Tools
-
-```python
-from mcp.client import MCPTool
-
-class DataAPITool(MCPTool):
-    def __init__(self):
-        super().__init__("data_api")
-    
-    async def create_record(self, record_data: dict) -> dict:
-        # Implement record creation logic
-        pass
-    
-    async def update_record(self, record_id: str, updates: dict) -> dict:
-        # Implement record update logic
-        pass
-```
+### Structured Logging
+- **JSON Format**: Machine-readable log output
+- **Context Tracking**: Correlation IDs and request tracing
+- **Performance Metrics**: Timing and resource usage
+- **Error Reporting**: Comprehensive error context
 
 ## 🧪 Testing
 
+### Test Coverage
+- **Unit Tests**: Individual agent and utility testing
+- **Integration Tests**: Workflow orchestration testing
+- **API Tests**: Endpoint validation and error handling
+- **Mock Providers**: Offline development and testing
+
+### Running Tests
 ```bash
 # Run all tests
 pytest
 
-# Run specific test category
-pytest tests/test_agents.py
-
 # Run with coverage
-pytest --cov=migration_platform
+pytest --cov=.
 
-# Run integration tests
-pytest tests/test_integration.py
+# Run specific test categories
+pytest tests/test_agents/
+pytest tests/test_workflows/
 ```
 
-## 📊 Monitoring
+## 🚀 Performance & Scalability
 
-### LangSmith Integration
+### Optimization Features
+- **Async Operations**: Non-blocking I/O operations
+- **Connection Pooling**: Efficient database connections
+- **Batch Processing**: Bulk data operations
+- **Caching**: Intelligent result caching
+- **Resource Management**: Memory and connection cleanup
 
-The platform integrates with LangSmith for comprehensive LLM call monitoring:
-
-- **Trace LLM calls** in real-time
-- **Debug agent interactions**
-- **Monitor performance metrics**
-- **Analyze prompt effectiveness**
-
-### Batch Processing Optimization
-
-The platform includes intelligent batch processing to optimize LLM usage:
-
-- **Batch Validation**: Process multiple records in single LLM calls
-- **Configurable Batch Size**: Adjust batch size based on model limits
-- **Reduced API Calls**: Minimize throttling and improve performance
-- **Cost Optimization**: Lower API costs through efficient batching
-
-**Example Configuration:**
-```python
-# In agents/validation.py
-batch_size = 5  # Process 5 records at a time
-```
-
-### Logging
-
-```python
-import structlog
-
-logger = structlog.get_logger()
-logger.info("Migration started", 
-           input_file="data.csv", 
-           mapping_file="mapping.yaml")
-```
+### Scalability Considerations
+- **Horizontal Scaling**: Stateless agent design
+- **Database Optimization**: Proper indexing and query optimization
+- **Load Balancing**: API endpoint distribution
+- **Monitoring**: Performance metrics and alerting
 
 ## 🔒 Security
 
-- **API Key Management**: Secure environment variable handling
-- **Data Encryption**: End-to-end encryption for sensitive data
-- **Access Control**: Role-based access control for API endpoints
-- **Audit Logging**: Comprehensive audit trails for all operations
+### Best Practices
+- **Environment Variables**: Secure credential management
+- **Input Validation**: Pydantic model validation
+- **SQL Injection Protection**: Parameterized queries
+- **Authentication**: Secure API access control
+- **Audit Logging**: Complete operation tracking
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+### Development Guidelines
+- **Code Style**: PEP 8 compliance with type hints
+- **Documentation**: Comprehensive docstrings and README updates
+- **Testing**: Maintain high test coverage
+- **Code Review**: All changes require review
+- **CI/CD**: Automated testing and deployment
+
+### Development Setup
+```bash
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
+
+# Install development dependencies
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+
+# Set up pre-commit hooks
+pre-commit install
+```
+
+## 📈 Roadmap
+
+### Planned Features
+- **Real-time Notifications**: WebSocket-based updates
+- **Advanced Analytics**: Machine learning insights
+- **Multi-tenant Support**: Organization and user management
+- **Plugin System**: Extensible agent architecture
+- **Cloud Deployment**: Kubernetes and Docker support
+- **Mobile App**: React Native mobile dashboard
+
+### Performance Improvements
+- **Streaming Processing**: Large file handling
+- **Distributed Processing**: Multi-node execution
+- **Caching Layer**: Redis integration
+- **CDN Integration**: Static asset optimization
+
+## 📚 Documentation
+
+### Additional Resources
+- **API Documentation**: Interactive Swagger UI at `/docs`
+- **Code Examples**: Sample implementations and use cases
+- **Troubleshooting**: Common issues and solutions
+- **Architecture Guide**: Detailed system design documentation
 
 ## 📄 License
 
-MIT License - see LICENSE file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 🆘 Support
 
-For support and questions:
-- Create an issue in the repository
-- Check the documentation
-- Review LangSmith traces for debugging
+### Getting Help
+- **Issues**: GitHub issue tracker
+- **Discussions**: GitHub discussions
+- **Documentation**: Comprehensive guides and examples
+- **Community**: Active developer community
 
-## 🔄 Roadmap
-
-- [x] **Performance Tracking** - Comprehensive timing and performance metrics
-- [x] **Batch Processing Optimization** - Intelligent batch processing to optimize LLM usage
-- [x] **LangSmith Integration** - Full LLM call tracking and debugging
-- [ ] Support for additional file formats (XML, EDI, Parquet, Avro)
-- [ ] Real-time migration monitoring dashboard
-- [ ] Advanced Agentic AI decision making capabilities
-- [ ] Multi-tenant support with agent isolation
-- [ ] Performance optimization for large datasets
-- [ ] Integration with additional MCP servers
-- [ ] Autonomous schema discovery and mapping
-- [ ] Cross-domain migration templates
-
-## 🎯 Use Cases
-
-### Insurance Data Migration
-- **Disability Insurance**: Migrate disability policy data from mainframe to modern systems
-- **Absence Management**: Transfer absence records and leave management data
-- **Group Policies**: Handle group insurance policy migrations
-- **Claims Processing**: Migrate claims data with validation and transformation
-
-### General Data Migration
-- **Customer Data**: Migrate customer information across systems
-- **Product Catalogs**: Transfer product data with complex relationships
-- **Financial Records**: Handle sensitive financial data migrations
-- **HR Systems**: Migrate employee and organizational data
-
-## 🚀 Quick Start
-
-1. **Install Dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **Configure Environment**:
-   ```bash
-   cp env.example .env
-   # Edit .env with your API keys
-   ```
-
-3. **Run Sample Migration**:
-   ```bash
-   python main.py migrate data/input/sample_disability_data.csv --dry-run
-   ```
-
-4. **Check Status**:
-   ```bash
-   python main.py status
-   ```
-
-5. **Run Tests**:
-   ```bash
-   python main.py test
-   ```
-
-### Output Files
-
-After running a migration, you'll find:
-
-- **`data/output/disability_policy_YYYYMMDD_HHMMSS.json`** - Transformed data in JSON format
-
-## 📈 Performance
-
-- **Concurrent Processing**: Handles large datasets with parallel processing
-- **Memory Efficient**: Streams data to avoid memory issues
-- **Error Recovery**: Automatic retry and error handling
-- **Progress Tracking**: Real-time progress monitoring
-- **Scalable Architecture**: Designed for enterprise-scale migrations
+### Contact
+- **Maintainers**: Core development team
+- **Contributors**: Community contributors
+- **Users**: Migration-Accelerators community
 
 ---
 
-**Migration-Accelerators** - Accelerating data migration with the power of Agentic AI 🚀
+**Migration-Accelerators** - Transforming data migration with AI-powered intelligence! 🚀
