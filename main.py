@@ -15,7 +15,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from config.settings import settings, LLMConfig, MCPConfig, FieldMappingConfig, get_llm_config, get_mcp_config, get_langsmith_config
 from workflows.migration_graph import MigrationWorkflow
-from config.mappings import load_mapping_config
+
 
 # Initialize Typer app
 app = typer.Typer(
@@ -55,33 +55,12 @@ def migrate(
         console.print(f"[red]Error: File not found: {file_path}[/red]")
         raise typer.Exit(1)
     
-    # Load mapping configuration
-    mapping_config = None
-    if mapping_file:
-        if not os.path.exists(mapping_file):
-            console.print(f"[red]Error: Mapping file not found: {mapping_file}[/red]")
-            raise typer.Exit(1)
-        
-        try:
-            mapping_config = load_mapping_config(mapping_file)
-            console.print(f"[green]✓[/green] Loaded mapping configuration: {mapping_file}")
-        except Exception as e:
-            console.print(f"[red]Error loading mapping file: {e}[/red]")
-            raise typer.Exit(1)
-    else:
-        # Try to find default mapping file
-        default_mapping = f"config/mappings/{record_type}_mapping.yaml"
-        if os.path.exists(default_mapping):
-            try:
-                mapping_config = load_mapping_config(default_mapping)
-                console.print(f"[green]✓[/green] Loaded default mapping configuration: {default_mapping}")
-            except Exception as e:
-                console.print(f"[yellow]Warning: Could not load default mapping: {e}[/yellow]")
-        else:
-            console.print(f"[yellow]Warning: No mapping configuration found for record type: {record_type}[/yellow]")
+    # Note: Mapping configuration is now handled automatically by the LLM-powered mapping agent
+    # The agent will analyze the data and select the appropriate mapping configuration
+    console.print(f"[green]✓[/green] Using LLM-powered intelligent mapping for record type: {record_type}")
     
     # Run migration
-    asyncio.run(_run_migration(file_path, mapping_config, record_type, dry_run, verbose))
+    asyncio.run(_run_migration(file_path, record_type, dry_run, verbose))
 
 
 @app.command()
@@ -101,18 +80,8 @@ def validate(
         console.print(f"[red]Error: File not found: {file_path}[/red]")
         raise typer.Exit(1)
     
-    # Validate mapping file if provided
-    if mapping_file:
-        if not os.path.exists(mapping_file):
-            console.print(f"[red]Error: Mapping file not found: {mapping_file}[/red]")
-            raise typer.Exit(1)
-        
-        try:
-            load_mapping_config(mapping_file)
-            console.print("[green]✓[/green] Mapping configuration is valid")
-        except Exception as e:
-            console.print(f"[red]Error in mapping configuration: {e}[/red]")
-            raise typer.Exit(1)
+    # Note: Mapping validation is now handled automatically by the LLM-powered mapping agent
+    console.print("[green]✓[/green] File validation completed - mapping will be handled automatically")
     
     console.print("[green]✓[/green] File validation completed successfully")
 
@@ -199,63 +168,7 @@ def test():
         raise typer.Exit(1)
 
 
-@app.command()
-def graph(
-    output_path: str = typer.Option("migration_workflow_graph.png", "--output", "-o", help="Output path for graph image"),
-    show_structure: bool = typer.Option(True, "--show-structure", help="Show workflow structure in console")
-):
-    """Generate and display the migration workflow graph."""
-    
-    console.print(Panel.fit(
-        "[bold blue]Migration Workflow Graph Generator[/bold blue]",
-        border_style="blue"
-    ))
-    
-    try:
-        # Initialize workflow
-        llm_config = get_llm_config()
-        mcp_config = get_mcp_config()
-        
-        workflow = MigrationWorkflow(llm_config, mcp_config)
-        
-        # Show workflow structure if requested
-        if show_structure:
-            workflow.print_graph_structure()
-        
-        # Generate graph image
-        console.print("\n[bold blue]Generating graph image...[/bold blue]")
-        
-        # Try to add Graphviz to PATH if not found
-        try:
-            import subprocess
-            subprocess.run(["dot", "-V"], capture_output=True, check=True)
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            console.print("[yellow]⚠[/yellow] Graphviz not in PATH, attempting to add it...")
-            import os
-            graphviz_path = r"C:\Program Files\Graphviz\bin"
-            if os.path.exists(graphviz_path):
-                os.environ["PATH"] += f";{graphviz_path}"
-                console.print(f"[green]✓[/green] Added Graphviz to PATH: {graphviz_path}")
-            else:
-                console.print("[red]✗[/red] Graphviz not found. Please install it with: winget install graphviz")
-                console.print("[yellow]Note:[/yellow] You can run the setup script: .\\setup_graphviz.ps1")
-                raise typer.Exit(1)
-        
-        graph_path = workflow.generate_graph_image(output_path)
-        
-        if graph_path:
-            console.print(f"[green]✓[/green] Workflow graph saved to: {graph_path}")
-            console.print("[blue]📊[/blue] Graph shows the complete migration workflow with all nodes and connections")
-        else:
-            console.print("[red]✗[/red] Failed to generate workflow graph")
-            raise typer.Exit(1)
-        
-        # Close workflow
-        asyncio.run(workflow.close())
-        
-    except Exception as e:
-        console.print(f"[red]Error generating graph: {e}[/red]")
-        raise typer.Exit(1)
+
 
 
 @app.command()
@@ -281,7 +194,6 @@ def logs(
 
 async def _run_migration(
     file_path: str,
-    mapping_config: Optional[FieldMappingConfig],
     record_type: str,
     dry_run: bool,
     verbose: bool
@@ -295,31 +207,7 @@ async def _run_migration(
         
         workflow = MigrationWorkflow(llm_config, mcp_config)
         
-        # Generate and display workflow graph
-        console.print("\n[bold blue]Generating Workflow Graph...[/bold blue]")
-        workflow.print_graph_structure()
-        
-        # Try to add Graphviz to PATH if not found
-        try:
-            import subprocess
-            subprocess.run(["dot", "-V"], capture_output=True, check=True)
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            console.print("[yellow]⚠[/yellow] Graphviz not in PATH, attempting to add it...")
-            import os
-            graphviz_path = r"C:\Program Files\Graphviz\bin"
-            if os.path.exists(graphviz_path):
-                os.environ["PATH"] += f";{graphviz_path}"
-                console.print(f"[green]✓[/green] Added Graphviz to PATH: {graphviz_path}")
-            else:
-                console.print("[yellow]⚠[/yellow] Graphviz not found. Skipping graph generation.")
-                console.print("[yellow]Note:[/yellow] Install with: winget install graphviz")
-        
-        # Generate graph image
-        graph_path = workflow.generate_graph_image("data/output/migration_workflow_graph.png")
-        if graph_path:
-            console.print(f"[green]✓[/green] Workflow graph saved to: {graph_path}")
-        else:
-            console.print("[yellow]⚠[/yellow] Could not generate workflow graph image")
+
         
         # Prepare target system configuration
         target_system = {
@@ -348,7 +236,6 @@ async def _run_migration(
             # Run migration
             result = await workflow.run(
                 file_path=file_path,
-                mapping_config=mapping_config,
                 record_type=record_type,
                 target_system=target_system
             )

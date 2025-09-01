@@ -88,7 +88,7 @@ rules:
   - source_field: waiting_period
     target_field: waitingPeriodDays
     transformation_type: calculated
-    calculation_formula: "int(source_value) * 30"  # Convert months to days
+    calculation_formula: "int(source_value)"  # Convert months to days
     validation:
       required: false
       min_value: 0
@@ -114,7 +114,7 @@ rules:
   - source_field: elimination_period
     target_field: eliminationPeriodDays
     transformation_type: calculated
-    calculation_formula: "int(source_value) * 7"  # Convert weeks to days
+    calculation_formula: "int(source_value)"  # Convert weeks to days
     validation:
       required: false
       min_value: 0

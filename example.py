@@ -18,7 +18,7 @@ from config.settings import settings, LLMConfig, MCPConfig
 from llm.providers import LLMProviderFactory
 from mcp_tools.client import MCPToolManager
 from workflows.migration_graph import MigrationWorkflow
-from config.mappings import load_mapping_config, create_default_mapping_config
+
 
 
 async def example_migration():
@@ -51,17 +51,9 @@ async def example_migration():
         print("   Running without MCP tools")
         mcp_manager = None
     
-    # Step 2: Load or create mapping configuration
-    print("\n2. Loading mapping configuration...")
-    
-    mapping_file = "config/mappings/disability_mapping.yaml"
-    try:
-        mapping_config = load_mapping_config(mapping_file)
-        print(f"   ✓ Mapping configuration loaded from {mapping_file}")
-    except FileNotFoundError:
-        print("   ⚠ Mapping file not found, creating default...")
-        mapping_config = create_default_mapping_config("disability")
-        print("   ✓ Default mapping configuration created")
+    # Step 2: Mapping configuration (handled automatically by LLM agent)
+    print("\n2. Mapping configuration...")
+    print("   ✓ Using LLM-powered intelligent mapping")
     
     # Step 3: Check input file
     print("\n3. Checking input file...")
@@ -86,7 +78,6 @@ async def example_migration():
     try:
         result = await workflow.run(
             file_path=input_file,
-            mapping_config=mapping_config,
             record_type="disability"
         )
         
@@ -138,12 +129,7 @@ async def example_migration():
         if pipeline.get("file_data"):
             print(f"   📁 File Data: {len(pipeline['file_data'])} records")
         
-        if pipeline.get("validated_data"):
-            validated_data = pipeline["validated_data"]
-            if isinstance(validated_data, dict) and "validation_results" in validated_data:
-                print(f"   ✅ Validated Data: {len(validated_data['validation_results'])} validation results")
-            else:
-                print(f"   ✅ Validated Data: {len(validated_data)} records")
+
         
         if pipeline.get("mapped_data"):
             print(f"   🔄 Mapped Data: {len(pipeline['mapped_data'])} records")

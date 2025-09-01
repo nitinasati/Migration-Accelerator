@@ -12,7 +12,7 @@ A modern, LLM-agnostic platform for accelerating data migration projects using A
 - **Dynamic Field Mapping**: AI-powered field mapping and transformation from configuration files
 - **Intelligent Validation**: LLM-powered data validation and business rule checking with batch processing
 - **Rich Logging**: LangSmith integration for LLM call tracking and debugging
-- **Workflow Visualization**: Interactive graph generation showing migration workflow structure
+
 - **Performance Tracking**: Comprehensive timing and performance metrics
 - **Domain Agnostic**: Works across various industries and data formats
 
@@ -45,35 +45,9 @@ cd Migration-Accelerators
 # Install dependencies
 pip install -r requirements.txt
 
-# Install Graphviz (required for workflow visualization)
-# Windows:
-winget install graphviz
-
-# macOS:
-brew install graphviz
-
-# Ubuntu/Debian:
-sudo apt-get install graphviz
-
 # Set up environment variables
 cp env.example .env
 # Edit .env with your configuration
-```
-
-### Graphviz Setup (Windows)
-
-For Windows users, run the setup script to configure Graphviz:
-
-```powershell
-# Run as Administrator
-.\setup_graphviz.ps1
-```
-
-This script will:
-- Check if Graphviz is installed
-- Add Graphviz to your PATH
-- Test the installation
-- Provide usage instructions
 
 ## ⚙️ Configuration
 
@@ -174,38 +148,11 @@ python main.py status
 # Run tests
 python main.py test
 
-# Generate workflow graph
-python main.py graph
-
-# Generate custom graph
-python main.py graph --output custom_workflow.png
-
 # View logs in LangSmith
 python main.py logs --project migration-accelerators
 ```
 
-### Workflow Visualization
 
-The platform includes powerful graph visualization capabilities:
-
-```bash
-# Generate and display workflow graph
-python main.py graph
-
-# Generate graph during migration
-python main.py migrate data/input/sample_disability_data.csv --dry-run
-```
-
-**Graph Features:**
-- **Visual Workflow**: See the complete migration workflow structure
-- **Node Relationships**: Understand how agents interact and data flows
-- **Error Paths**: Visualize error handling and recovery paths
-- **PNG Export**: Save graphs as high-quality images
-- **Console Display**: View workflow structure in terminal
-
-**Generated Files:**
-- `migration_workflow_graph.png` - Main workflow graph
-- `data/output/migration_workflow_graph.png` - Graph generated during migration
 
 ### Performance Tracking
 
@@ -252,7 +199,7 @@ python main.py migrate data/input/sample_disability_data.csv --dry-run
 │   ├── transformation.py  # Transformation agent
 │   └── api_integration.py # API integration agent
 ├── workflows/             # LangGraph workflows
-│   └── migration_graph.py # Main migration workflow with graph generation
+│   └── migration_graph.py # Main migration workflow
 ├── llm/                   # LLM provider abstractions
 │   ├── providers.py       # LLM provider factory with LangSmith integration
 │   └── prompts.py         # Prompt templates including batch validation
@@ -264,12 +211,11 @@ python main.py migrate data/input/sample_disability_data.csv --dry-run
 │   └── mappings/          # Field mapping files
 ├── data/                  # Sample data and outputs
 │   ├── input/             # Input data files
-│   └── output/            # Generated output files and graphs
+│   └── output/            # Generated output files
 ├── tests/                 # Test suite
-├── main.py               # CLI entry point with graph commands
+├── main.py               # CLI entry point
 ├── example.py            # Usage examples
-├── setup_graphviz.ps1    # Graphviz setup script for Windows
-├── requirements.txt      # Dependencies including graphviz
+├── requirements.txt      # Dependencies
 └── README.md             # This file
 ```
 
@@ -390,11 +336,9 @@ For support and questions:
 
 ## 🔄 Roadmap
 
-- [x] **Workflow Visualization** - Interactive graph generation showing migration workflow structure
 - [x] **Performance Tracking** - Comprehensive timing and performance metrics
 - [x] **Batch Processing Optimization** - Intelligent batch processing to optimize LLM usage
 - [x] **LangSmith Integration** - Full LLM call tracking and debugging
-- [x] **Graphviz Integration** - Visual workflow representation with PNG export
 - [ ] Support for additional file formats (XML, EDI, Parquet, Avro)
 - [ ] Real-time migration monitoring dashboard
 - [ ] Advanced Agentic AI decision making capabilities
@@ -425,40 +369,23 @@ For support and questions:
    pip install -r requirements.txt
    ```
 
-2. **Install Graphviz**:
-   ```bash
-   # Windows
-   winget install graphviz
-   
-   # macOS
-   brew install graphviz
-   
-   # Ubuntu/Debian
-   sudo apt-get install graphviz
-   ```
-
-3. **Configure Environment**:
+2. **Configure Environment**:
    ```bash
    cp env.example .env
    # Edit .env with your API keys
    ```
 
-4. **Run Sample Migration**:
+3. **Run Sample Migration**:
    ```bash
    python main.py migrate data/input/sample_disability_data.csv --dry-run
    ```
 
-5. **Generate Workflow Graph**:
-   ```bash
-   python main.py graph
-   ```
-
-6. **Check Status**:
+4. **Check Status**:
    ```bash
    python main.py status
    ```
 
-7. **Run Tests**:
+5. **Run Tests**:
    ```bash
    python main.py test
    ```
@@ -468,8 +395,6 @@ For support and questions:
 After running a migration, you'll find:
 
 - **`data/output/disability_policy_YYYYMMDD_HHMMSS.json`** - Transformed data in JSON format
-- **`data/output/migration_workflow_graph.png`** - Visual workflow graph
-- **`migration_workflow_graph.png`** - Standalone workflow graph (when using `graph` command)
 
 ## 📈 Performance
 
