@@ -475,7 +475,7 @@ class MigrationWorkflow:
             
             # Use TransformationAgent for LLM-based transformation
             result = await self.transformer.process(state["mapped_data"], transformation_context)
-            
+
             if result.success:
                 # Store transformed data and update progress
                 state["transformed_data"] = result.data

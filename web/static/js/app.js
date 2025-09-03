@@ -200,9 +200,12 @@ function getStatusColor(status) {
  * Load dashboard data
  */
 async function loadDashboardData() {
+    // Declare statsCards outside try block so it's available in finally
+    let statsCards = null;
+    
     try {
         // Show loading state
-        const statsCards = document.getElementById('stats-cards');
+        statsCards = document.getElementById('stats-cards');
         if (statsCards) {
             statsCards.classList.add('loading');
         }
