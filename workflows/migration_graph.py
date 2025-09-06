@@ -2,23 +2,26 @@
 LangGraph migration workflow for the Migration-Accelerators platform.
 """
 
-from typing import Any, Dict, List, Optional, TypedDict, Annotated
+# Standard library imports
 import operator
 import time
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, TypedDict, Annotated
+
+# Third-party imports
+import structlog
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
-import structlog
 
-
+# Local imports
+from agents.api_integration import APIIntegrationAgent
 from agents.file_reader import FileReaderAgent
 from agents.mapping import MappingAgent
 from agents.transformation import TransformationAgent
-from agents.api_integration import APIIntegrationAgent
-from config.settings import LLMConfig, MCPConfig
 from config.database import get_database_config
-from memory import PostgresMemoryManager
+from config.settings import LLMConfig, MCPConfig
 from llm.providers import initialize_langsmith
+from memory import PostgresMemoryManager
 
 
 class MigrationState(TypedDict):

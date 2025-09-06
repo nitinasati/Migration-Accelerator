@@ -2,13 +2,55 @@
 LLM provider abstraction for the Migration-Accelerators platform.
 """
 
-import asyncio
+# Standard library imports
 import json
 import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Union
+
+# Third-party imports
 import structlog
 
+# Optional third-party imports (may not be available)
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
+
+try:
+    from langsmith import Client as LangSmithClient
+except ImportError:
+    LangSmithClient = None
+
+try:
+    from langchain.schema import HumanMessage, SystemMessage
+except ImportError:
+    try:
+        from langchain_core.messages import HumanMessage, SystemMessage
+    except ImportError:
+        HumanMessage = SystemMessage = None
+
+try:
+    from langchain_openai import ChatOpenAI
+except ImportError:
+    ChatOpenAI = None
+
+try:
+    from langchain_anthropic import ChatAnthropic
+except ImportError:
+    ChatAnthropic = None
+
+try:
+    from langchain_aws import ChatBedrock
+except ImportError:
+    ChatBedrock = None
+
+try:
+    from langchain_google_vertexai import ChatVertexAI
+except ImportError:
+    ChatVertexAI = None
+
+# Local imports
 from config.settings import LLMConfig, LLMProvider, get_langsmith_config
 
 
@@ -16,8 +58,8 @@ def initialize_langsmith():
     """Initialize LangSmith tracing."""
     try:
         # Load environment variables from .env file
-        from dotenv import load_dotenv
-        load_dotenv()
+        if load_dotenv:
+            load_dotenv()
         
         # Get LangSmith configuration
         langsmith_config = get_langsmith_config()
@@ -45,12 +87,15 @@ def initialize_langsmith():
                 os.environ["LANGCHAIN_ENDPOINT"] = langsmith_config.endpoint
             
             # Import and initialize LangSmith
-            try:
-                from langsmith import Client
-                client = Client(api_key=api_key)
-                print(f"✅ LangSmith initialized - Project: {project}")
-                return True
-            except ImportError:
+            if LangSmithClient:
+                try:
+                    client = LangSmithClient(api_key=api_key)
+                    print(f"✅ LangSmith initialized - Project: {project}")
+                    return True
+                except Exception as e:
+                    print(f"⚠️ LangSmith initialization failed: {e}")
+                    return False
+            else:
                 print("⚠️ LangSmith package not installed. Install with: pip install langsmith")
                 return False
         else:
@@ -62,24 +107,30 @@ def initialize_langsmith():
         return False
 
 
-class LLMCallbackHandler:
-    """Custom callback handler for LLM operations."""
+def _create_messages(prompt: str, system_message: Optional[str] = None):
+    """Create message objects for LangChain providers."""
+    if not HumanMessage or not SystemMessage:
+        raise ImportError("LangChain message classes not available")
     
-    def __init__(self, agent_name: str):
-        self.agent_name = agent_name
-        self.logger = structlog.get_logger().bind(agent=agent_name)
+    messages = []
+    if system_message:
+        messages.append(SystemMessage(content=system_message))
+    messages.append(HumanMessage(content=prompt))
+    return messages
+
+
+def _generate_structured_prompt(prompt: str, schema: Dict[str, Any], system_message: Optional[str] = None) -> str:
+    """Generate a structured prompt for JSON output."""
+    return f"""
+    {system_message or ""}
     
-    def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any) -> None:
-        """Called when LLM starts."""
-        self.logger.info("LLM operation started", prompts_count=len(prompts))
+    {prompt}
     
-    def on_llm_end(self, response: Any, **kwargs: Any) -> None:
-        """Called when LLM ends."""
-        self.logger.info("LLM operation completed", response_length=len(str(response)))
+    Please respond with a JSON object that matches this schema:
+    {json.dumps(schema, indent=2)}
     
-    def on_llm_error(self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any) -> None:
-        """Called when LLM encounters an error."""
-        self.logger.error("LLM operation failed", error=str(error))
+    Return only the JSON object, no additional text.
+    """
 
 
 class BaseLLMProvider(ABC):
@@ -89,7 +140,6 @@ class BaseLLMProvider(ABC):
         self.config = config
         self.agent_name = agent_name
         self.logger = structlog.get_logger().bind(agent=agent_name)
-        self.callback_handler = LLMCallbackHandler(agent_name)
         self._client = None
     
     @abstractmethod
@@ -170,7 +220,7 @@ class MockLLMProvider(BaseLLMProvider):
     ) -> str:
         """Generate mock text response."""
         try:
-            self.callback_handler.on_llm_start({}, [prompt])
+            self.logger.info("Mock LLM generation started", prompt_length=len(prompt))
             
             # Simple mock response based on prompt content
             if "file" in prompt.lower() and "read" in prompt.lower():
@@ -204,11 +254,10 @@ class MockLLMProvider(BaseLLMProvider):
             else:
                 response = f"Mock response for: {prompt[:50]}..."
             
-            self.callback_handler.on_llm_end(response)
+            self.logger.info("Mock LLM generation completed", response_length=len(response))
             return response
             
         except Exception as e:
-            self.callback_handler.on_llm_error(e)
             self.logger.error("Mock LLM generation failed", error=str(e))
             raise
     
@@ -288,9 +337,8 @@ class OpenAIProvider(BaseLLMProvider):
     async def initialize(self) -> None:
         """Initialize OpenAI provider."""
         try:
-            # Try to import OpenAI provider
-            from langchain_openai import ChatOpenAI
-            from langchain.schema import BaseMessage, HumanMessage, SystemMessage
+            if not ChatOpenAI:
+                raise ImportError("langchain-openai package not installed")
             
             self._client = ChatOpenAI(
                 model=self.config.model,
@@ -315,13 +363,7 @@ class OpenAIProvider(BaseLLMProvider):
     ) -> str:
         """Generate text using OpenAI."""
         try:
-            from langchain.schema import HumanMessage, SystemMessage
-            
-            messages = []
-            if system_message:
-                messages.append(SystemMessage(content=system_message))
-            messages.append(HumanMessage(content=prompt))
-            
+            messages = _create_messages(prompt, system_message)
             response = await self._client.ainvoke(messages)
             return response.content
         except Exception as e:
@@ -336,17 +378,7 @@ class OpenAIProvider(BaseLLMProvider):
     ) -> Dict[str, Any]:
         """Generate structured output using OpenAI."""
         try:
-            structured_prompt = f"""
-            {system_message or ""}
-            
-            {prompt}
-            
-            Please respond with a JSON object that matches this schema:
-            {json.dumps(schema, indent=2)}
-            
-            Return only the JSON object, no additional text.
-            """
-            
+            structured_prompt = _generate_structured_prompt(prompt, schema, system_message)
             response = await self.generate(structured_prompt)
             return json.loads(response)
         except Exception as e:
@@ -360,7 +392,8 @@ class AnthropicProvider(BaseLLMProvider):
     async def initialize(self) -> None:
         """Initialize Anthropic provider."""
         try:
-            from langchain_anthropic import ChatAnthropic
+            if not ChatAnthropic:
+                raise ImportError("langchain-anthropic package not installed")
             
             self._client = ChatAnthropic(
                 model=self.config.model,
@@ -385,13 +418,7 @@ class AnthropicProvider(BaseLLMProvider):
     ) -> str:
         """Generate text using Anthropic."""
         try:
-            from langchain.schema import HumanMessage, SystemMessage
-            
-            messages = []
-            if system_message:
-                messages.append(SystemMessage(content=system_message))
-            messages.append(HumanMessage(content=prompt))
-            
+            messages = _create_messages(prompt, system_message)
             response = await self._client.ainvoke(messages)
             return response.content
         except Exception as e:
@@ -406,17 +433,7 @@ class AnthropicProvider(BaseLLMProvider):
     ) -> Dict[str, Any]:
         """Generate structured output using Anthropic."""
         try:
-            structured_prompt = f"""
-            {system_message or ""}
-            
-            {prompt}
-            
-            Please respond with a JSON object that matches this schema:
-            {json.dumps(schema, indent=2)}
-            
-            Return only the JSON object, no additional text.
-            """
-            
+            structured_prompt = _generate_structured_prompt(prompt, schema, system_message)
             response = await self.generate(structured_prompt)
             return json.loads(response)
         except Exception as e:
@@ -430,7 +447,8 @@ class BedrockProvider(BaseLLMProvider):
     async def initialize(self) -> None:
         """Initialize Bedrock provider."""
         try:
-            from langchain_aws import ChatBedrock
+            if not ChatBedrock:
+                raise ImportError("langchain-aws package not installed")
             
             self._client = ChatBedrock(
                 model_id=self.config.model,
@@ -455,13 +473,7 @@ class BedrockProvider(BaseLLMProvider):
     ) -> str:
         """Generate text using Bedrock."""
         try:
-            from langchain.schema import HumanMessage, SystemMessage
-            
-            messages = []
-            if system_message:
-                messages.append(SystemMessage(content=system_message))
-            messages.append(HumanMessage(content=prompt))
-            
+            messages = _create_messages(prompt, system_message)
             response = await self._client.ainvoke(messages)
             return response.content
         except Exception as e:
@@ -476,17 +488,7 @@ class BedrockProvider(BaseLLMProvider):
     ) -> Dict[str, Any]:
         """Generate structured output using Bedrock."""
         try:
-            structured_prompt = f"""
-            {system_message or ""}
-            
-            {prompt}
-            
-            Please respond with a JSON object that matches this schema:
-            {json.dumps(schema, indent=2)}
-            
-            Return only the JSON object, no additional text.
-            """
-            
+            structured_prompt = _generate_structured_prompt(prompt, schema, system_message)
             response = await self.generate(structured_prompt)
             return json.loads(response)
         except Exception as e:
@@ -500,7 +502,8 @@ class VertexAIProvider(BaseLLMProvider):
     async def initialize(self) -> None:
         """Initialize Vertex AI provider."""
         try:
-            from langchain_google_vertexai import ChatVertexAI
+            if not ChatVertexAI:
+                raise ImportError("langchain-google-vertexai package not installed")
             
             self._client = ChatVertexAI(
                 model=self.config.model,
@@ -524,13 +527,7 @@ class VertexAIProvider(BaseLLMProvider):
     ) -> str:
         """Generate text using Vertex AI."""
         try:
-            from langchain.schema import HumanMessage, SystemMessage
-            
-            messages = []
-            if system_message:
-                messages.append(SystemMessage(content=system_message))
-            messages.append(HumanMessage(content=prompt))
-            
+            messages = _create_messages(prompt, system_message)
             response = await self._client.ainvoke(messages)
             return response.content
         except Exception as e:
@@ -545,17 +542,7 @@ class VertexAIProvider(BaseLLMProvider):
     ) -> Dict[str, Any]:
         """Generate structured output using Vertex AI."""
         try:
-            structured_prompt = f"""
-            {system_message or ""}
-            
-            {prompt}
-            
-            Please respond with a JSON object that matches this schema:
-            {json.dumps(schema, indent=2)}
-            
-            Return only the JSON object, no additional text.
-            """
-            
+            structured_prompt = _generate_structured_prompt(prompt, schema, system_message)
             response = await self.generate(structured_prompt)
             return json.loads(response)
         except Exception as e:

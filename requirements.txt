@@ -25,6 +25,10 @@ aiofiles>=23.0.0
 asyncpg>=0.29.0
 psycopg2-binary>=2.9.0
 
+# Graph visualization
+networkx>=3.0
+matplotlib>=3.7.0
+
 # Development and testing
 pytest>=7.0.0
 pytest-asyncio>=0.21.0

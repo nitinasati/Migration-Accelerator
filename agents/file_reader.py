@@ -146,7 +146,7 @@ class FileReaderAgent(BaseAgent):
             file_format = self._detect_format_from_extension(file_path)
             
             # Create file reading prompt
-            prompt = get_prompt(
+            user_prompt = get_prompt(
                 "file_reader_read_file",
                 file_path=file_path or "unknown",
                 file_format=file_format,
@@ -156,7 +156,7 @@ class FileReaderAgent(BaseAgent):
             system_prompt = get_system_prompt("file_reader")
             
             # Get LLM response
-            response = await self.llm_provider.generate(prompt, system_prompt)
+            response = await self.llm_provider.generate(user_prompt, system_prompt)
             
             # Parse LLM response
             result = self._parse_llm_response(response)
