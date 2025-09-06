@@ -5,6 +5,14 @@
 {% block content %}
 <div class="row">
     <div class="col-12">
+        <div id="dashboard-error" class="alert alert-danger" style="display: none;">
+            <!-- Error messages will be displayed here -->
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
         <h1 class="display-4 mb-4">
             <i class="bi bi-speedometer2 text-primary"></i> Migration Dashboard
         </h1>
@@ -16,7 +24,7 @@
 
 <!-- Statistics Cards -->
 <div class="row mb-4" id="stats-cards">
-    <div class="col-md-3 mb-3">
+    <div class="col-md-2 mb-3">
         <div class="card bg-primary text-white h-100">
             <div class="card-body text-center">
                 <i class="bi bi-list-ul display-6"></i>
@@ -26,7 +34,7 @@
         </div>
     </div>
     
-    <div class="col-md-3 mb-3">
+    <div class="col-md-2 mb-3">
         <div class="card bg-success text-white h-100">
             <div class="card-body text-center">
                 <i class="bi bi-check-circle display-6"></i>
@@ -36,7 +44,7 @@
         </div>
     </div>
     
-    <div class="col-md-3 mb-3">
+    <div class="col-md-2 mb-3">
         <div class="card bg-warning text-white h-100">
             <div class="card-body text-center">
                 <i class="bi bi-play-circle display-6"></i>
@@ -46,12 +54,22 @@
         </div>
     </div>
     
-    <div class="col-md-3 mb-3">
+    <div class="col-md-2 mb-3">
         <div class="card bg-danger text-white h-100">
             <div class="card-body text-center">
                 <i class="bi bi-x-circle display-6"></i>
                 <h3 class="card-title" id="failed-runs">-</h3>
                 <p class="card-text">Failed</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-2 mb-3">
+        <div class="card bg-info text-white h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-clock display-6"></i>
+                <h3 class="card-title" id="recent-24h">-</h3>
+                <p class="card-text">Last 24 Hours</p>
             </div>
         </div>
     </div>
@@ -123,6 +141,49 @@
 </div>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Loading state for statistics cards */
+    #stats-cards.loading .card {
+        opacity: 0.7;
+        transition: opacity 0.3s ease;
+    }
+    
+    #stats-cards.loading .card-title {
+        position: relative;
+    }
+    
+    #stats-cards.loading .card-title::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        right: -20px;
+        width: 16px;
+        height: 16px;
+        margin-top: -8px;
+        border: 2px solid transparent;
+        border-top: 2px solid currentColor;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    /* Auto-refresh status animations */
+    .badge.bg-warning {
+        animation: pulse 1s ease-in-out infinite alternate;
+    }
+    
+    @keyframes pulse {
+        from { opacity: 1; }
+        to { opacity: 0.7; }
+    }
+</style>
+{% endblock %}
+
 {% block extra_js %}
 <script>
     // Dashboard functionality
@@ -143,11 +204,80 @@
             const failedRunsElement = document.getElementById('failed-runs');
             const recent24hElement = document.getElementById('recent-24h');
             
-            if (totalRunsElement) totalRunsElement.textContent = stats.total_migrations || 0;
-            if (completedRunsElement) completedRunsElement.textContent = stats.status_breakdown?.completed || 0;
-            if (runningRunsElement) runningRunsElement.textContent = stats.status_breakdown?.running || 0;
-            if (failedRunsElement) failedRunsElement.textContent = stats.status_breakdown?.failed || 0;
-            if (recent24hElement) recent24hElement.textContent = stats.recent_24h || 0;
+            console.log('Found DOM elements:', {
+                totalRuns: totalRunsElement,
+                completedRuns: completedRunsElement,
+                runningRuns: runningRunsElement,
+                failedRuns: failedRunsElement,
+                recent24h: recent24hElement
+            });
+            
+            console.log('Updating statistics with data:', stats);
+            
+            // Check if cards already have valid data (prevent overwriting)
+            const shouldUpdateCard = (element, newValue) => {
+                if (!element) return false;
+                const currentValue = element.textContent;
+                // Only update if current value is '-' or '0' or if it's been more than 5 minutes
+                return currentValue === '-' || currentValue === '0' || 
+                       !element.dataset.lastUpdate || 
+                       (Date.now() - parseInt(element.dataset.lastUpdate)) > 300000; // 5 minutes
+            };
+            
+            if (totalRunsElement && shouldUpdateCard(totalRunsElement, stats.total_migrations)) {
+                totalRunsElement.textContent = stats.total_migrations || 0;
+                totalRunsElement.dataset.lastUpdate = Date.now();
+                // Force visibility and add debugging
+                totalRunsElement.style.color = 'white';
+                totalRunsElement.style.visibility = 'visible';
+                totalRunsElement.style.display = 'block';
+                console.log('Updated total-runs with:', stats.total_migrations || 0);
+                console.log('Element text content after update:', totalRunsElement.textContent);
+                console.log('Element innerHTML after update:', totalRunsElement.innerHTML);
+                console.log('Element computed styles:', {
+                    color: window.getComputedStyle(totalRunsElement).color,
+                    visibility: window.getComputedStyle(totalRunsElement).visibility,
+                    display: window.getComputedStyle(totalRunsElement).display,
+                    fontSize: window.getComputedStyle(totalRunsElement).fontSize
+                });
+            } else {
+                console.log('Skipping total-runs update - already has valid data or recently updated');
+            }
+            
+            if (completedRunsElement && shouldUpdateCard(completedRunsElement, stats.status_breakdown?.completed)) {
+                completedRunsElement.textContent = stats.status_breakdown?.completed || 0;
+                completedRunsElement.dataset.lastUpdate = Date.now();
+                console.log('Updated completed-runs with:', stats.status_breakdown?.completed || 0);
+                console.log('Element text content after update:', completedRunsElement.textContent);
+            } else {
+                console.log('Skipping completed-runs update - already has valid data or recently updated');
+            }
+            
+            if (runningRunsElement && shouldUpdateCard(runningRunsElement, stats.status_breakdown?.running)) {
+                runningRunsElement.textContent = stats.status_breakdown?.running || 0;
+                runningRunsElement.dataset.lastUpdate = Date.now();
+                console.log('Updated running-runs with:', stats.status_breakdown?.running || 0);
+                console.log('Element text content after update:', runningRunsElement.textContent);
+            } else {
+                console.log('Skipping running-runs update - already has valid data or recently updated');
+            }
+            
+            if (failedRunsElement && shouldUpdateCard(failedRunsElement, stats.status_breakdown?.failed)) {
+                failedRunsElement.textContent = stats.status_breakdown?.failed || 0;
+                failedRunsElement.dataset.lastUpdate = Date.now();
+                console.log('Updated failed-runs with:', stats.status_breakdown?.failed || 0);
+                console.log('Element text content after update:', failedRunsElement.textContent);
+            } else {
+                console.log('Skipping failed-runs update - already has valid data or recently updated');
+            }
+            
+            if (recent24hElement && shouldUpdateCard(recent24hElement, stats.recent_24h)) {
+                recent24hElement.textContent = stats.recent_24h || 0;
+                recent24hElement.dataset.lastUpdate = Date.now();
+                console.log('Updated recent-24h with:', stats.recent_24h || 0);
+            } else {
+                console.log('Skipping recent-24h update - already has valid data or recently updated');
+            }
             
             // Load recent migrations
             console.log('Loading recent migrations...');
@@ -204,6 +334,18 @@
             }
         } catch (error) {
             console.error('Error loading dashboard:', error);
+            console.error('Error details:', {
+                message: error.message,
+                stack: error.stack,
+                name: error.name
+            });
+            
+            // Show error message on the page
+            const errorElement = document.getElementById('dashboard-error');
+            if (errorElement) {
+                errorElement.textContent = `Error loading dashboard: ${error.message}`;
+                errorElement.style.display = 'block';
+            }
         }
     }
     

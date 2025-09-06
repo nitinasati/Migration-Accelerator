@@ -114,15 +114,27 @@ def _create_pool() -> None:
             except Exception as e:
                 logger.warning(f"Error closing existing pool: {e}")
         
+        # Get database configuration from settings
+        import sys
+        import os
+        
+        # Add project root to Python path if not already there
+        current_dir = os.path.dirname(os.path.abspath(__file__))  # api directory
+        project_root = os.path.dirname(current_dir)  # project root
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        
+        from config.settings import settings
+        
         # Create new pool with optimized settings
         _pool = ThreadedConnectionPool(
             minconn=5,       # Reduced from 10 to 5
             maxconn=15,      # Reduced from 20 to 15
-            host=os.getenv("DB_HOST", "localhost"),
-            port=int(os.getenv("DB_PORT", "5432")),
-            database=os.getenv("DB_NAME", "migration"),
-            user=os.getenv("DB_USER", "postgres"),
-            password=os.getenv("DB_PASSWORD", ""),
+            host=os.getenv("DB_HOST", settings.db_host),
+            port=int(os.getenv("DB_PORT", str(settings.db_port))),
+            database=os.getenv("DB_NAME", settings.db_name),
+            user=os.getenv("DB_USER", settings.db_user),
+            password=os.getenv("DB_PASSWORD", settings.db_password or ""),
             # Connection settings
             connect_timeout=3,      # Reduced from 5 to 3 seconds
             # PostgreSQL keepalive settings

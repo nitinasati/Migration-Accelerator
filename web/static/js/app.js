@@ -51,12 +51,16 @@ function setupNavigation() {
  * Set up auto-refresh for dashboard
  */
 function setupAutoRefresh() {
-    // Refresh dashboard data every 30 seconds
-    refreshInterval = setInterval(() => {
-        if (currentPage === 'dashboard') {
-            loadDashboardData();
+    // DISABLED: This conflicts with our smart refresh logic in index.html
+    // The dashboard now uses manual refresh and smart update prevention
+    console.log('Auto-refresh disabled - using smart refresh logic instead');
+    
+    // Uncomment the line below if you want to re-enable auto-refresh
+     refreshInterval = setInterval(() => {
+         if (currentPage === 'dashboard') {
+             loadDashboardData();
         }
-    }, 30000);
+     }, 5000);
 }
 
 /**
@@ -196,6 +200,8 @@ function getStatusColor(status) {
     return colors[status] || 'secondary';
 }
 
+
+
 /**
  * Load dashboard data
  */
@@ -204,6 +210,8 @@ async function loadDashboardData() {
     let statsCards = null;
     
     try {
+        // Auto-refresh in progress
+        
         // Show loading state
         statsCards = document.getElementById('stats-cards');
         if (statsCards) {
@@ -225,9 +233,14 @@ async function loadDashboardData() {
         
         updateRecentMigrationsTable(migrations);
         
+
+        
+        // Auto-refresh completed successfully
+        
     } catch (error) {
         console.error('Failed to load dashboard data:', error);
         showAlert('Failed to load dashboard data. Please refresh the page.', 'danger');
+        // Auto-refresh failed
     } finally {
         // Remove loading state
         if (statsCards) {
@@ -240,17 +253,38 @@ async function loadDashboardData() {
  * Update statistics cards
  */
 function updateStatisticsCards(stats) {
+    // Use smart update logic to prevent overwriting valid data
     const elements = {
-        'total-runs': stats.total_runs || 0,
-        'completed-runs': stats.completed_runs || 0,
-        'running-runs': stats.running_runs || 0,
-        'failed-runs': stats.failed_runs || 0
+        'total-runs': stats.total_migrations || stats.total_runs || 0,
+        'completed-runs': stats.status_breakdown?.completed || stats.completed_runs || 0,
+        'running-runs': stats.status_breakdown?.running || stats.running_runs || 0,
+        'failed-runs': stats.status_breakdown?.failed || stats.failed_runs || 0,
+        'recent-24h': stats.recent_24h || 0
     };
     
-    Object.entries(elements).forEach(([id, value]) => {
+    Object.entries(elements).forEach(([id, newValue]) => {
         const element = document.getElementById(id);
         if (element) {
-            element.textContent = value;
+            // Check if element already has valid data (prevent overwriting)
+            const currentValue = element.textContent;
+            
+            // Always update if:
+            // 1. Current value is placeholder (-) or 0
+            // 2. No lastUpdate timestamp (first time)
+            // 3. It's been more than 30 seconds (allow more frequent updates)
+            // 4. The new value is different from current value (data changed)
+            const shouldUpdate = currentValue === '-' || currentValue === '0' || 
+                               !element.dataset.lastUpdate || 
+                               (Date.now() - parseInt(element.dataset.lastUpdate)) > 30000 || // 30 seconds instead of 5 minutes
+                               currentValue !== newValue.toString(); // Update if value changed
+            
+            if (shouldUpdate) {
+                element.textContent = newValue;
+                element.dataset.lastUpdate = Date.now();
+                console.log(`Updated ${id} with: ${newValue} (was: ${currentValue})`);
+            } else {
+                console.log(`Skipping ${id} update - no change needed: ${currentValue}`);
+            }
         }
     });
 }
@@ -259,13 +293,13 @@ function updateStatisticsCards(stats) {
  * Update recent migrations table
  */
 function updateRecentMigrationsTable(migrations) {
-    const tbody = document.querySelector('#recent-migrations-table tbody');
+    const tbody = document.querySelector('#recent-migrations-table');
     if (!tbody) return;
     
     if (migrations.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="text-center text-muted">
+                <td colspan="7" class="text-center text-muted">
                     <i class="bi bi-inbox"></i> No migrations found
                 </td>
             </tr>
@@ -276,15 +310,20 @@ function updateRecentMigrationsTable(migrations) {
     tbody.innerHTML = migrations.map(migration => `
         <tr>
             <td>
-                <span class="text-truncate d-inline-block" style="max-width: 200px;" title="${migration.file_path}">
-                    ${migration.file_path}
+                <a href="/migrations/${migration.id}" class="text-decoration-none">
+                    ${migration.id.substring(0, 8)}...
+                </a>
+            </td>
+            <td>
+                <span class="text-truncate d-inline-block" style="max-width: 200px;" title="${migration.file_path || 'N/A'}">
+                    ${migration.file_path || 'N/A'}
                 </span>
             </td>
             <td>
-                <span class="badge bg-secondary">${migration.record_type}</span>
+                <span class="badge bg-secondary">${migration.record_type || 'N/A'}</span>
             </td>
             <td>
-                <span class="badge bg-${getStatusColor(migration.status)}">${migration.status}</span>
+                <span class="badge bg-${getStatusColor(migration.status)}">${migration.status || 'N/A'}</span>
             </td>
             <td>${formatDateTime(migration.created_at)}</td>
             <td>${formatDuration(migration.total_duration)}</td>
