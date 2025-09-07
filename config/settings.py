@@ -157,10 +157,12 @@ class MigrationSettings(BaseSettings):
     log_level: str = Field(default="INFO", description="Log level")
     log_format: str = Field(default="json", description="Log format")
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": False,
+        "extra": "ignore"
+    }
 
 
 # Global settings instance

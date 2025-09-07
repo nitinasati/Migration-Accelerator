@@ -89,7 +89,7 @@ def initialize_langsmith():
             # Import and initialize LangSmith
             if LangSmithClient:
                 try:
-                    client = LangSmithClient(api_key=api_key)
+                    LangSmithClient(api_key=api_key)
                     print(f"✅ LangSmith initialized - Project: {project}")
                     return True
                 except Exception as e:

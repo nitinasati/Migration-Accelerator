@@ -21,7 +21,7 @@ from agents.transformation import TransformationAgent
 from config.database import get_database_config
 from config.settings import LLMConfig, MCPConfig
 from llm.providers import initialize_langsmith
-from memory import PostgresMemoryManager
+from memory.postgres_memory import PostgresMemoryManager
 
 
 class MigrationState(TypedDict):
