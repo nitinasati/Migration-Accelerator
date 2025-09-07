@@ -9,7 +9,7 @@ from pathlib import Path
 
 from config.settings import settings, LLMConfig, MCPConfig
 from llm.providers import LLMProviderFactory
-from mcp_tools.client import MCPToolManager
+from mcp_tools.file_tool_client import MCPFileClient
 
 
 
@@ -121,9 +121,10 @@ class TestMCPClient:
             api_key="test_key"
         )
         
-        manager = MCPToolManager(mcp_config)
+        manager = MCPFileClient()
         assert manager is not None
-        assert manager.config.server_url == "http://localhost:3000"
+        # MCPFileClient doesn't use config in the same way
+        assert hasattr(manager, 'server_path')
 
 
 

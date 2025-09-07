@@ -648,6 +648,14 @@ class MigrationWorkflow:
             state["success"] = len(state["errors"]) == 0
             state["current_step"] = "completed"
             
+            # Log final status for debugging
+            self.logger.info(
+                "Final status determined", 
+                success=state["success"], 
+                error_count=len(state["errors"]), 
+                errors=state["errors"][:3] if state["errors"] else []  # Log first 3 errors for debugging
+            )
+            
             # Update migration run status in database
             if self.memory_manager and state.get("run_id"):
                 memory_store = self.memory_manager.get_memory_store()

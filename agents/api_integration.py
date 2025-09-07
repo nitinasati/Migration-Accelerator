@@ -10,7 +10,7 @@ from .base_agent import BaseAgent, AgentResult
 from config.settings import LLMConfig, MCPConfig
 from llm.providers import BaseLLMProvider, LLMProviderFactory
 from llm.prompts import get_prompt, get_system_prompt
-from mcp_tools.client import MCPToolManager
+from mcp_tools.file_tool_client import MCPFileClient
 
 
 class APIIntegrationAgent(BaseAgent):
@@ -36,7 +36,7 @@ class APIIntegrationAgent(BaseAgent):
     ):
         super().__init__("api_integration", llm_config, mcp_config)
         self.llm_provider: Optional[BaseLLMProvider] = None
-        self.mcp_manager: Optional[MCPToolManager] = None
+        self.mcp_client: Optional[MCPFileClient] = None
         self.api_endpoints: Dict[str, Dict[str, Any]] = {}
         self.authentication_cache: Dict[str, Any] = {}
     
@@ -50,8 +50,8 @@ class APIIntegrationAgent(BaseAgent):
             self.logger.info("LLM provider initialized for API integration agent")
         
         if self.mcp_config:
-            self.mcp_manager = MCPToolManager(self.mcp_config)
-            await self.mcp_manager.initialize()
+            self.mcp_client = MCPFileClient()
+            await self.mcp_client.initialize()
             self.logger.info("MCP manager initialized for API integration agent")
         
         # Initialize default API endpoints
@@ -314,8 +314,8 @@ class APIIntegrationAgent(BaseAgent):
                 headers["X-API-Key"] = authentication["api_key"]
             
             # Make API call using MCP
-            if self.mcp_manager:
-                response = await self.mcp_manager.make_api_call(
+            if self.mcp_client:
+                response = await self.mcp_client.make_api_call(
                     method=method,
                     url=url,
                     data=data,
@@ -394,8 +394,8 @@ class APIIntegrationAgent(BaseAgent):
                 "grant_type": "password"
             }
             
-            if self.mcp_manager:
-                response = await self.mcp_manager.make_api_call(
+            if self.mcp_client:
+                response = await self.mcp_client.make_api_call(
                     method="POST",
                     url=token_url,
                     data=auth_data,
@@ -478,8 +478,8 @@ class APIIntegrationAgent(BaseAgent):
             "client_secret": client_secret
         }
         
-        if self.mcp_manager:
-            response = await self.mcp_manager.make_api_call(
+        if self.mcp_client:
+            response = await self.mcp_client.make_api_call(
                 method="POST",
                 url=token_url,
                 data=oauth_data,
@@ -517,10 +517,10 @@ class APIIntegrationAgent(BaseAgent):
     async def health_check(self) -> bool:
         """Check API health."""
         try:
-            if not self.mcp_manager:
+            if not self.mcp_client:
                 return False
             
-            return await self.mcp_manager.health_check()
+            return await self.mcp_client.health_check()
             
         except Exception as e:
             self.logger.error("API health check failed", error=str(e))
@@ -537,14 +537,14 @@ class APIIntegrationAgent(BaseAgent):
             Dict[str, Any]: API status information
         """
         try:
-            if not self.mcp_manager:
+            if not self.mcp_client:
                 return {
                     "success": False,
                     "error": self.MCP_MANAGER_UNAVAILABLE
                 }
             
             # Make health check request
-            response = await self.mcp_manager.make_api_call(
+            response = await self.mcp_client.make_api_call(
                 method="GET",
                 url=f"{base_url}/health",
                 headers={"Accept": self.DEFAULT_CONTENT_TYPE}
@@ -672,8 +672,8 @@ class APIIntegrationAgent(BaseAgent):
     
     async def close(self) -> None:
         """Close the API integration agent."""
-        if self.mcp_manager:
-            await self.mcp_manager.close()
+        if self.mcp_client:
+            await self.mcp_client.close()
         
         await super().stop()
         self.logger.info("API integration agent closed")
