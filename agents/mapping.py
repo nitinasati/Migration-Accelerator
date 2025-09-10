@@ -10,7 +10,7 @@ import structlog
 
 from .base_agent import BaseAgent, AgentResult
 from config.settings import LLMConfig, MCPConfig
-from llm.providers import BaseLLMProvider, LLMProviderFactory
+from llm.llm_provider import BaseLLMProvider, LLMProviderFactory
 from llm.prompts import get_prompt, get_system_prompt
 
 

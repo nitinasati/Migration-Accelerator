@@ -10,8 +10,8 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 from pathlib import Path
 
-from models.requests import MigrationTriggerRequest
-from models.responses import MigrationStatus, MigrationTriggerResponse, MigrationStatusResponse, MigrationProgress
+from api.models.requests import MigrationTriggerRequest
+from api.models.responses import MigrationTriggerResponse, MigrationStatusResponse, MigrationStatus, MigrationProgress
 
 
 # Configure logging

@@ -1,0 +1,11 @@
+member_id,first_name,last_name,date_of_birth,gender,email,phone,address_line1,address_line2,city,state,zip_code,plan_type,enrollment_date,status,ssn,emergency_contact_name,emergency_contact_phone,department,job_title
+MEM001,John,Smith,1985-03-15,M,john.smith@company.com,555-0101,123 Main St,Apt 4B,New York,NY,10001,Premium,2023-01-15,Active,123-45-6789,Jane Smith,555-0102,Engineering,Software Developer
+MEM002,Sarah,Johnson,1990-07-22,F,sarah.johnson@company.com,555-0201,456 Oak Ave,,Los Angeles,CA,90210,Basic,2023-02-01,Active,234-56-7890,Mike Johnson,555-0202,Marketing,Marketing Manager
+MEM003,Michael,Brown,1978-11-08,M,michael.brown@company.com,555-0301,789 Pine Rd,Suite 100,Chicago,IL,60601,Premium,2022-12-10,Active,345-67-8901,Lisa Brown,555-0302,Finance,Financial Analyst
+MEM004,Emily,Davis,1992-05-30,F,emily.davis@company.com,555-0401,321 Elm St,,Houston,TX,77001,Standard,2023-03-20,Active,456-78-9012,Tom Davis,555-0402,HR,HR Specialist
+MEM005,David,Wilson,1982-09-12,M,david.wilson@company.com,555-0501,654 Maple Dr,Unit 25,Phoenix,AZ,85001,Premium,2023-01-05,Pending,567-89-0123,Carol Wilson,555-0502,Operations,Operations Manager
+MEM006,Jennifer,Garcia,1988-12-03,F,jennifer.garcia@company.com,555-0601,987 Cedar Ln,,Philadelphia,PA,19101,Basic,2023-04-15,Active,678-90-1234,Carlos Garcia,555-0602,Sales,Sales Representative
+MEM007,Robert,Miller,1975-04-18,M,robert.miller@company.com,555-0701,147 Birch Blvd,Floor 3,San Antonio,TX,78201,Standard,2022-11-30,Inactive,789-01-2345,Nancy Miller,555-0702,IT,System Administrator
+MEM008,Lisa,Anderson,1995-08-25,F,lisa.anderson@company.com,555-0801,258 Spruce Ave,,San Diego,CA,92101,Premium,2023-05-10,Active,890-12-3456,Mark Anderson,555-0802,Design,UX Designer
+MEM009,James,Taylor,1980-01-14,M,james.taylor@company.com,555-0901,369 Willow Way,Apt 12A,Dallas,TX,75201,Basic,2023-02-28,Active,901-23-4567,Susan Taylor,555-0902,Legal,Legal Counsel
+MEM010,Amanda,Thomas,1987-06-07,F,amanda.thomas@company.com,555-1001,741 Aspen Ct,,Austin,TX,78701,Standard,2023-03-05,Pending,012-34-5678,Brian Thomas,555-1002,Admin,Executive Assistant

@@ -3,14 +3,16 @@ API Integration Agent for the Migration-Accelerators platform.
 """
 
 import asyncio
+import json
+import os
 from typing import Any, Dict, List, Optional, Union
 import structlog
+import httpx
 
 from .base_agent import BaseAgent, AgentResult
 from config.settings import LLMConfig, MCPConfig
-from llm.providers import BaseLLMProvider, LLMProviderFactory
+from llm.llm_provider import BaseLLMProvider, LLMProviderFactory
 from llm.prompts import get_prompt, get_system_prompt
-from mcp_tools.file_tool_client import MCPFileClient
 
 
 class APIIntegrationAgent(BaseAgent):
@@ -27,7 +29,6 @@ class APIIntegrationAgent(BaseAgent):
     
     # Constants
     DEFAULT_CONTENT_TYPE = "application/json"
-    MCP_MANAGER_UNAVAILABLE = "MCP manager not available"
     
     def __init__(
         self,
@@ -36,7 +37,7 @@ class APIIntegrationAgent(BaseAgent):
     ):
         super().__init__("api_integration", llm_config, mcp_config)
         self.llm_provider: Optional[BaseLLMProvider] = None
-        self.mcp_client: Optional[MCPFileClient] = None
+        self.mcp_client: Optional[Any] = None
         self.api_endpoints: Dict[str, Dict[str, Any]] = {}
         self.authentication_cache: Dict[str, Any] = {}
     
@@ -50,9 +51,9 @@ class APIIntegrationAgent(BaseAgent):
             self.logger.info("LLM provider initialized for API integration agent")
         
         if self.mcp_config:
-            self.mcp_client = MCPFileClient()
-            await self.mcp_client.initialize()
-            self.logger.info("MCP manager initialized for API integration agent")
+            # MCP client removed - using direct file operations
+            self.mcp_client = None
+            self.logger.info("MCP client disabled - using direct file operations")
         
         # Initialize default API endpoints
         await self._initialize_default_endpoints()
@@ -313,27 +314,8 @@ class APIIntegrationAgent(BaseAgent):
             elif auth_type == "api_key" and authentication.get("api_key"):
                 headers["X-API-Key"] = authentication["api_key"]
             
-            # Make API call using MCP
-            if self.mcp_client:
-                response = await self.mcp_client.make_api_call(
-                    method=method,
-                    url=url,
-                    data=data,
-                    headers=headers
-                )
-                
-                return {
-                    "success": response.get("success", False),
-                    "status_code": response.get("status_code"),
-                    "data": response.get("data"),
-                    "error": response.get("error"),
-                    "headers": response.get("headers", {})
-                }
-            else:
-                return {
-                    "success": False,
-                    "error": self.MCP_MANAGER_UNAVAILABLE
-                }
+            # Use direct HTTP call (MCP client removed)
+            return await self._make_direct_api_call(method, url, data, headers)
                 
         except Exception as e:
             self.logger.error("API call failed", error=str(e))
@@ -374,6 +356,46 @@ class APIIntegrationAgent(BaseAgent):
                 "error": str(e)
             }
     
+    async def _make_direct_api_call(self, method: str, url: str, data: Any, headers: Dict[str, str]) -> Dict[str, Any]:
+        """
+        Make a direct HTTP API call using httpx.
+        
+        Args:
+            method: HTTP method (GET, POST, PUT, DELETE)
+            url: API endpoint URL
+            data: Request data
+            headers: HTTP headers
+            
+        Returns:
+            Dict[str, Any]: API response
+        """
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.request(
+                    method=method,
+                    url=url,
+                    json=data if isinstance(data, dict) else None,
+                    content=data if not isinstance(data, dict) else None,
+                    headers=headers,
+                    timeout=30.0
+                )
+                
+                return {
+                    "success": response.status_code < 400,
+                    "status_code": response.status_code,
+                    "data": response.json() if response.headers.get("content-type", "").startswith("application/json") else response.text,
+                    "error": None if response.status_code < 400 else f"HTTP {response.status_code}: {response.text}",
+                    "headers": dict(response.headers)
+                }
+        except Exception as e:
+            return {
+                "success": False,
+                "status_code": None,
+                "data": None,
+                "error": str(e),
+                "headers": {}
+            }
+
     async def _authenticate_bearer_token(self, auth_config: Dict[str, Any]) -> Dict[str, Any]:
         """Authenticate using bearer token."""
         try:
@@ -394,31 +416,30 @@ class APIIntegrationAgent(BaseAgent):
                 "grant_type": "password"
             }
             
-            if self.mcp_client:
-                response = await self.mcp_client.make_api_call(
-                    method="POST",
-                    url=token_url,
-                    data=auth_data,
-                    headers={"Content-Type": "application/x-www-form-urlencoded"}
-                )
+            response = await self._make_direct_api_call(
+                method="POST",
+                url=token_url,
+                data=auth_data,
+                headers={"Content-Type": "application/x-www-form-urlencoded"}
+            )
+            
+            if response.get("success", False):
+                token_data = response.get("data", {})
+                access_token = token_data.get("access_token")
                 
-                if response.get("success", False):
-                    token_data = response.get("data", {})
-                    access_token = token_data.get("access_token")
+                if access_token:
+                    # Cache token
+                    self.authentication_cache["bearer_token"] = {
+                        "token": access_token,
+                        "expires_at": token_data.get("expires_at"),
+                        "token_type": token_data.get("token_type", "Bearer")
+                    }
                     
-                    if access_token:
-                        # Cache token
-                        self.authentication_cache["bearer_token"] = {
-                            "token": access_token,
-                            "expires_at": token_data.get("expires_at"),
-                            "token_type": token_data.get("token_type", "Bearer")
-                        }
-                        
-                        return {
-                            "success": True,
-                            "token": access_token,
-                            "expires_at": token_data.get("expires_at")
-                        }
+                    return {
+                        "success": True,
+                        "token": access_token,
+                        "expires_at": token_data.get("expires_at")
+                    }
                 
                 return {
                     "success": False,
@@ -478,32 +499,31 @@ class APIIntegrationAgent(BaseAgent):
             "client_secret": client_secret
         }
         
-        if self.mcp_client:
-            response = await self.mcp_client.make_api_call(
-                method="POST",
-                url=token_url,
-                data=oauth_data,
-                headers={"Content-Type": "application/x-www-form-urlencoded"}
-            )
+        response = await self._make_direct_api_call(
+            method="POST",
+            url=token_url,
+            data=oauth_data,
+            headers={"Content-Type": "application/x-www-form-urlencoded"}
+        )
+        
+        if response.get("success", False):
+            token_data = response.get("data", {})
+            access_token = token_data.get("access_token")
             
-            if response.get("success", False):
-                token_data = response.get("data", {})
-                access_token = token_data.get("access_token")
+            if access_token:
+                # Cache token
+                self.authentication_cache["oauth2"] = {
+                    "token": access_token,
+                    "expires_at": token_data.get("expires_at"),
+                    "token_type": token_data.get("token_type", "Bearer")
+                }
                 
-                if access_token:
-                    # Cache token
-                    self.authentication_cache["oauth2"] = {
-                        "token": access_token,
-                        "expires_at": token_data.get("expires_at"),
-                        "token_type": token_data.get("token_type", "Bearer")
-                    }
-                    
-                    return {
-                        "success": True,
-                        "token": access_token,
-                        "expires_at": token_data.get("expires_at")
-                    }
-            
+                return {
+                    "success": True,
+                    "token": access_token,
+                    "expires_at": token_data.get("expires_at")
+                }
+        
             return {
                 "success": False,
                 "error": "OAuth2 authentication failed"
@@ -511,16 +531,14 @@ class APIIntegrationAgent(BaseAgent):
         else:
             return {
                 "success": False,
-                "error": self.MCP_MANAGER_UNAVAILABLE
+                "error": "API integration not available"
             }
     
     async def health_check(self) -> bool:
         """Check API health."""
         try:
-            if not self.mcp_client:
-                return False
-            
-            return await self.mcp_client.health_check()
+            # MCP client removed - return True for health check
+            return True
             
         except Exception as e:
             self.logger.error("API health check failed", error=str(e))
@@ -537,16 +555,13 @@ class APIIntegrationAgent(BaseAgent):
             Dict[str, Any]: API status information
         """
         try:
-            if not self.mcp_client:
-                return {
-                    "success": False,
-                    "error": self.MCP_MANAGER_UNAVAILABLE
-                }
+            # MCP client removed - proceed with direct API call
             
             # Make health check request
-            response = await self.mcp_client.make_api_call(
+            response = await self._make_direct_api_call(
                 method="GET",
                 url=f"{base_url}/health",
+                data=None,
                 headers={"Accept": self.DEFAULT_CONTENT_TYPE}
             )
             
@@ -672,8 +687,6 @@ class APIIntegrationAgent(BaseAgent):
     
     async def close(self) -> None:
         """Close the API integration agent."""
-        if self.mcp_client:
-            await self.mcp_client.close()
-        
+        # MCP client removed - no cleanup needed
         await super().stop()
         self.logger.info("API integration agent closed")

@@ -1,0 +1,124 @@
+{
+  "members": [
+    {
+      "MemberID": "001",
+      "Name": "John Smith",
+      "Email": "john.smith@email.com",
+      "Phone": "(555) 123-4567",
+      "Address": "123 Main Street, Springfield, IL 62701",
+      "DateOfBirth": "1985-03-15",
+      "MembershipType": "Premium",
+      "JoinDate": "2020-01-15",
+      "Status": "Active",
+      "EmergencyContact": "Jane Smith - (555) 123-4568"
+    },
+    {
+      "MemberID": "002",
+      "Name": "Sarah Johnson",
+      "Email": "sarah.johnson@email.com",
+      "Phone": "(555) 234-5678",
+      "Address": "456 Oak Avenue, Chicago, IL 60601",
+      "DateOfBirth": "1990-07-22",
+      "MembershipType": "Standard",
+      "JoinDate": "2019-05-10",
+      "Status": "Active",
+      "EmergencyContact": "Michael Johnson - (555) 234-5679"
+    },
+    {
+      "MemberID": "003",
+      "Name": "Michael Davis",
+      "Email": "michael.davis@email.com",
+      "Phone": "(555) 345-6789",
+      "Address": "789 Pine Road, Rockford, IL 61101",
+      "DateOfBirth": "1978-11-08",
+      "MembershipType": "Premium",
+      "JoinDate": "2021-03-20",
+      "Status": "Active",
+      "EmergencyContact": "Lisa Davis - (555) 345-6790"
+    },
+    {
+      "MemberID": "004",
+      "Name": "Emily Wilson",
+      "Email": "emily.wilson@email.com",
+      "Phone": "(555) 456-7890",
+      "Address": "321 Elm Street, Peoria, IL 61602",
+      "DateOfBirth": "1992-12-03",
+      "MembershipType": "Basic",
+      "JoinDate": "2022-08-14",
+      "Status": "Active",
+      "EmergencyContact": "Robert Wilson - (555) 456-7891"
+    },
+    {
+      "MemberID": "005",
+      "Name": "David Brown",
+      "Email": "david.brown@email.com",
+      "Phone": "(555) 567-8901",
+      "Address": "654 Maple Lane, Aurora, IL 60502",
+      "DateOfBirth": "1988-04-17",
+      "MembershipType": "Standard",
+      "JoinDate": "2020-11-05",
+      "Status": "Suspended",
+      "EmergencyContact": "Jennifer Brown - (555) 567-8902"
+    },
+    {
+      "MemberID": "006",
+      "Name": "Jessica Taylor",
+      "Email": "jessica.taylor@email.com",
+      "Phone": "(555) 678-9012",
+      "Address": "987 Cedar Court, Naperville, IL 60540",
+      "DateOfBirth": "1995-09-25",
+      "MembershipType": "Premium",
+      "JoinDate": "2023-01-12",
+      "Status": "Active",
+      "EmergencyContact": "Mark Taylor - (555) 678-9013"
+    },
+    {
+      "MemberID": "007",
+      "Name": "Christopher Lee",
+      "Email": "christopher.lee@email.com",
+      "Phone": "(555) 789-0123",
+      "Address": "147 Birch Boulevard, Joliet, IL 60431",
+      "DateOfBirth": "1982-06-11",
+      "MembershipType": "Basic",
+      "JoinDate": "2019-12-08",
+      "Status": "Inactive",
+      "EmergencyContact": "Amanda Lee - (555) 789-0124"
+    },
+    {
+      "MemberID": "008",
+      "Name": "Amanda Garcia",
+      "Email": "amanda.garcia@email.com",
+      "Phone": "(555) 890-1234",
+      "Address": "258 Walnut Drive, Elgin, IL 60120",
+      "DateOfBirth": "1991-01-30",
+      "MembershipType": "Standard",
+      "JoinDate": "2021-07-23",
+      "Status": "Active",
+      "EmergencyContact": "Carlos Garcia - (555) 890-1235"
+    },
+    {
+      "MemberID": "009",
+      "Name": "James Martinez",
+      "Email": "james.martinez@email.com",
+      "Phone": "(555) 901-2345",
+      "Address": "369 Hickory Place, Schaumburg, IL 60173",
+      "DateOfBirth": "1987-10-14",
+      "MembershipType": "Premium",
+      "JoinDate": "2020-04-18",
+      "Status": "Active",
+      "EmergencyContact": "Maria Martinez - (555) 901-2346"
+    },
+    {
+      "MemberID": "010",
+      "Name": "Rachel Anderson",
+      "Email": "rachel.anderson@email.com",
+      "Phone": "(555) 012-3456",
+      "Address": "741 Sycamore Street, Waukegan, IL 60085",
+      "DateOfBirth": "1993-08-07",
+      "MembershipType": "Basic",
+      "JoinDate": "2022-02-28",
+      "Status": "Active",
+      "EmergencyContact": "Kevin Anderson - (555) 012-3457"
+    }
+  ]
+}

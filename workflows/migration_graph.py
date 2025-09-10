@@ -5,6 +5,7 @@ LangGraph migration workflow for the Migration-Accelerators platform.
 # Standard library imports
 import operator
 import time
+import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, TypedDict, Annotated
 
@@ -15,12 +16,12 @@ from langgraph.prebuilt import ToolNode
 
 # Local imports
 from agents.api_integration import APIIntegrationAgent
-from agents.file_reader import FileReaderAgent
+from agents.simple_file_reader import SimpleFileReaderAgent
 from agents.mapping import MappingAgent
 from agents.transformation import TransformationAgent
 from config.database import get_database_config
 from config.settings import LLMConfig, MCPConfig
-from llm.providers import initialize_langsmith
+from llm.llm_provider import initialize_langsmith
 from memory.postgres_memory import PostgresMemoryManager
 
 
@@ -62,6 +63,7 @@ class MigrationState(TypedDict):
     mapping_config: Optional[Any]  # Will be selected by LLM agent
     record_type: str
     target_system: Dict[str, Any]
+    layout_file: Optional[str]  # Optional layout file for mainframe files
     run_id: Optional[str]  # Database run ID for state persistence
     
     # Workflow data
@@ -139,7 +141,8 @@ class MigrationWorkflow:
         initialize_langsmith()
         
         # Initialize specialized agents for each workflow step
-        self.file_reader = FileReaderAgent(llm_config, mcp_config)
+        # Initialize simple file reader agent
+        self.file_reader = SimpleFileReaderAgent(llm_config)
         self.mapper = MappingAgent(llm_config, mcp_config)
         self.transformer = TransformationAgent(llm_config, mcp_config)
         self.api_integrator = APIIntegrationAgent(llm_config, mcp_config)
@@ -308,19 +311,13 @@ class MigrationWorkflow:
         try:
             self.logger.info("Reading file", file_path=state["file_path"])
             
-            # Prepare file reading context with format-specific parameters
-            context = {
-                "file_format": state.get("file_format"),
-                "encoding": state.get("encoding", "utf-8"),
-                "delimiter": state.get("delimiter", ",")
-            }
+            # Use SimpleFileReaderAgent to read and parse the file
+            layout_file = state.get("layout_file")  # Optional layout file for mainframe files
+            result = await self.file_reader.read_file(state["file_path"], layout_file)
             
-            # Use FileReaderAgent to read and parse the file
-            result = await self.file_reader.process(state["file_path"], context)
-            
-            if result.success:
+            if result.get("success", False):
                 # Store parsed file data in workflow state
-                state["file_data"] = result.data
+                state["file_data"] = result
                 state["completed_steps"].append("read_file")
                 state["progress"] = 25.0
                 state["current_step"] = "file_read"
@@ -328,16 +325,29 @@ class MigrationWorkflow:
                 # Save state to database
                 if self.memory_manager:
                     memory_store = self.memory_manager.get_memory_store()
+                    # Extract record count from the result - handle different LLM output formats
+                    records_count = result.get("total_records", 0)
+                    if records_count == 0:
+                        # Try different possible field names for the data array
+                        data_array = result.get("data", []) or result.get("members", []) or result.get("records", [])
+                        records_count = len(data_array) if isinstance(data_array, list) else 1
                     await memory_store.save_state(
                         step_name="read_file",
                         state=state,
-                        metadata={"progress": 25.0, "step": "read_file", "records_count": len(result.data) if isinstance(result.data, list) else 1}
+                        metadata={"progress": 25.0, "step": "read_file", "records_count": records_count}
                     )
                 
-                self.logger.info("File read successfully", records_count=len(result.data) if isinstance(result.data, list) else 1)
+                # Extract record count for logging
+                records_count = result.get("total_records", 0)
+                if records_count == 0:
+                    # Try different possible field names for the data array
+                    data_array = result.get("data", []) or result.get("members", []) or result.get("records", [])
+                    records_count = len(data_array) if isinstance(data_array, list) else 1
+                self.logger.info("File read successfully", records_count=records_count)
             else:
                 # Record errors and update state for error handling
-                state["errors"].extend(result.errors)
+                error_msg = result.get("error", "Unknown error")
+                state["errors"].append(error_msg)
                 state["current_step"] = "file_read_error"
                 
                 # Save error state to database
@@ -346,10 +356,10 @@ class MigrationWorkflow:
                     await memory_store.save_state(
                         step_name="read_file_error",
                         state=state,
-                        metadata={"progress": 25.0, "step": "read_file_error", "errors": result.errors}
+                        metadata={"progress": 25.0, "step": "read_file_error", "errors": [error_msg]}
                     )
                 
-                self.logger.error("File reading failed", errors=result.errors)
+                self.logger.error("File reading failed", errors=[error_msg])
             
             return state
             
@@ -625,9 +635,20 @@ class MigrationWorkflow:
             self.logger.info("Finalizing migration workflow")
             
             # Create comprehensive final result structure
+            # Extract record count from file_data - handle different LLM output formats
+            file_data = state.get("file_data", {})
+            if isinstance(file_data, dict):
+                records_count = file_data.get("total_records", 0)
+                if records_count == 0:
+                    # Try different possible field names for the data array
+                    data_array = file_data.get("data", []) or file_data.get("members", []) or file_data.get("records", [])
+                    records_count = len(data_array) if isinstance(data_array, list) else 1
+            else:
+                records_count = len(file_data) if isinstance(file_data, list) else 0
+            
             final_result = {
                 "migration_summary": {
-                    "total_records_processed": len(state["file_data"]) if state["file_data"] else 0,
+                    "total_records_processed": records_count,
                     "completed_steps": state["completed_steps"],
                     "progress": state["progress"],
                     "success": len(state["errors"]) == 0
@@ -723,9 +744,20 @@ class MigrationWorkflow:
         self.logger.error("Handling workflow error", errors=state["errors"])
         
         # Create comprehensive error result with partial progress
+        # Extract record count from file_data - handle different LLM output formats
+        file_data = state.get("file_data", {})
+        if isinstance(file_data, dict):
+            records_count = file_data.get("total_records", 0)
+            if records_count == 0:
+                # Try different possible field names for the data array
+                data_array = file_data.get("data", []) or file_data.get("members", []) or file_data.get("records", [])
+                records_count = len(data_array) if isinstance(data_array, list) else 1
+        else:
+            records_count = len(file_data) if isinstance(file_data, list) else 0
+        
         error_result = {
             "migration_summary": {
-                "total_records_processed": len(state["file_data"]) if state["file_data"] else 0,
+                "total_records_processed": records_count,
                 "completed_steps": state["completed_steps"],
                 "progress": state["progress"],
                 "success": False,
@@ -765,7 +797,8 @@ class MigrationWorkflow:
         self,
         file_path: str,
         record_type: str = "disability",
-        target_system: Optional[Dict[str, Any]] = None
+        target_system: Optional[Dict[str, Any]] = None,
+        layout_file: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Execute the complete migration workflow.
@@ -776,9 +809,9 @@ class MigrationWorkflow:
         
         Args:
             file_path: Path to the source file to be migrated
-            mapping_config: Field mapping configuration for data transformation
             record_type: Type of records being processed (e.g., 'disability', 'absence')
             target_system: Target system configuration for API integration
+            layout_file: Optional layout file for mainframe fixed-width files
             
         Returns:
             Dict[str, Any]: Complete migration result with:
@@ -798,6 +831,7 @@ class MigrationWorkflow:
                 "mapping_config": None,  # Mapping config will be selected by LLM agent
                 "record_type": record_type,
                 "target_system": target_system or {},
+                "layout_file": layout_file,  # Optional layout file for mainframe files
                 "run_id": None,  # Will be set during initialization
                 "file_data": None,
                 "mapped_data": None,

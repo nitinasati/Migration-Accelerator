@@ -6,14 +6,14 @@ import time
 import logging
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from typing import List, Optional
-from models.database import MigrationRun, WorkflowState, WorkflowCheckpoint, SearchFilters
-from models.requests import MigrationTriggerRequest, MigrationStatusRequest
-from models.responses import MigrationTriggerResponse, MigrationStatusResponse, ErrorResponse
-from database import (
+from config.database import MigrationRun, WorkflowState, WorkflowCheckpoint, SearchFilters
+from api.models.requests import MigrationTriggerRequest, MigrationStatusRequest
+from api.models.responses import MigrationTriggerResponse, MigrationStatusResponse, ErrorResponse
+from api.database import (
     get_migration_runs, get_migration_run, get_workflow_states,
     get_workflow_checkpoints, search_migration_runs, get_migration_stats
 )
-from services.migration_service import migration_service
+from api.services.migration_service import migration_service
 
 # Configure logging
 logger = logging.getLogger(__name__)

@@ -32,9 +32,9 @@ from typing import List, Optional, Dict, Any
 # Defer dotenv loading until needed
 # from dotenv import load_dotenv
 
-from models.database import (
+from config.database import (
     MigrationRun, WorkflowState, WorkflowCheckpoint, 
-    MigrationRunSummary, SearchFilters
+    SearchFilters
 )
 
 # Configure logging

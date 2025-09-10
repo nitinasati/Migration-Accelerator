@@ -2,18 +2,14 @@
 Configuration settings for the Migration-Accelerators platform.
 """
 
+import os
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 from enum import Enum
 
 
-class LLMProvider(str, Enum):
-    """Supported LLM providers."""
-    OPENAI = "openai"
-    BEDROCK = "bedrock"
-    ANTHROPIC = "anthropic"
-    VERTEXAI = "vertexai"
+# LLMProvider enum removed - now using string values for LLM-API-Service
 
 
 class FileFormat(str, Enum):
@@ -51,14 +47,11 @@ class ValidationSeverity(str, Enum):
 
 
 class LLMConfig(BaseModel):
-    """LLM provider configuration."""
-    provider: LLMProvider = Field(..., description="LLM provider to use")
-    model: str = Field(..., description="Model name/ID")
+    """LLM configuration for LLM-API-Service."""
+    provider: str = Field(default="openai", description="LLM provider to use (openai, anthropic, bedrock, vertex, deepseek, mock)")
+    model: Optional[str] = Field(None, description="Model name/ID (optional, will use provider default)")
     temperature: float = Field(default=0.1, description="Generation temperature")
     max_tokens: int = Field(default=4000, description="Maximum tokens")
-    api_key: Optional[str] = Field(None, description="API key")
-    base_url: Optional[str] = Field(None, description="Base URL for API")
-    region: Optional[str] = Field(None, description="AWS region for Bedrock")
 
 
 class MCPConfig(BaseModel):
@@ -115,18 +108,16 @@ class FieldMappingConfig(BaseModel):
 class MigrationSettings(BaseSettings):
     """Main application settings."""
     
-    # LLM Configuration
-    llm_provider: LLMProvider = Field(default=LLMProvider.OPENAI, description="Default LLM provider")
-    llm_model: str = Field(default="gpt-4o-mini", description="Default LLM model")
+    # LLM-API-Service Configuration
+    llm_api_service_url: str = Field(default="http://127.0.0.1:8010", description="LLM-API-Service base URL")
+    llm_api_service_key: Optional[str] = Field(None, description="LLM-API-Service API key")
+    llm_api_timeout: float = Field(default=30.0, description="LLM API request timeout")
+    
+    # LLM Configuration (for LLM-API-Service)
+    llm_provider: str = Field(default="openai", description="Default LLM provider")
+    llm_model: Optional[str] = Field(None, description="Default LLM model (optional)")
     llm_temperature: float = Field(default=0.1, description="Default LLM temperature")
     llm_max_tokens: int = Field(default=4000, description="Default max tokens")
-    
-    # API Keys
-    openai_api_key: Optional[str] = Field(None, description="OpenAI API key")
-    anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key")
-    aws_access_key_id: Optional[str] = Field(None, description="AWS access key ID")
-    aws_secret_access_key: Optional[str] = Field(None, description="AWS secret access key")
-    aws_region: str = Field(default="us-east-1", description="AWS region")
     
     # LangSmith Configuration
     langsmith_api_key: Optional[str] = Field(None, description="LangSmith API key")
@@ -175,9 +166,7 @@ def get_llm_config() -> LLMConfig:
         provider=settings.llm_provider,
         model=settings.llm_model,
         temperature=settings.llm_temperature,
-        max_tokens=settings.llm_max_tokens,
-        api_key=getattr(settings, f"{settings.llm_provider.value}_api_key", None),
-        region=settings.aws_region if settings.llm_provider == LLMProvider.BEDROCK else None
+        max_tokens=settings.llm_max_tokens
     )
 
 

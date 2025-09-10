@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes.migrations import router as migrations_router
+from api.routes.migrations import router as migrations_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     try:
-        from database import close_pool
+        from api.database import close_pool
         close_pool()
         print("✅ Database connection pool closed on shutdown")
     except Exception as e:
@@ -44,7 +44,7 @@ async def _initialize_database_async():
         # Small delay to let FastAPI start up first
         await asyncio.sleep(0.1)
         
-        from database import get_pool
+        from api.database import get_pool
         # This will create and warm up the pool
         pool = get_pool()
         print("✅ Database connection pool initialized and warmed up on startup")
@@ -85,7 +85,7 @@ async def health_check():
 async def database_health_check():
     """Database health check endpoint."""
     try:
-        from database import get_pool_status, check_connection_health
+        from api.database import get_pool_status, check_connection_health
         pool_status = get_pool_status()
         connection_healthy = check_connection_health()
         

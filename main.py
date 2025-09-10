@@ -39,6 +39,7 @@ def migrate(
     file_path: str = typer.Argument(..., help="Path to the input file"),
     mapping_file: Optional[str] = typer.Option(None, "--mapping", "-m", help="Path to mapping configuration file"),
     record_type: str = typer.Option("disability", "--type", "-t", help="Record type (disability, absence, etc.)"),
+    layout_file: Optional[str] = typer.Option(None, "--layout", "-l", help="Path to layout file for mainframe fixed-width files"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Run in dry-run mode (no API calls)"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output")
 ):
@@ -60,7 +61,7 @@ def migrate(
     console.print(f"[green]✓[/green] Using LLM-powered intelligent mapping for record type: {record_type}")
     
     # Run migration
-    asyncio.run(_run_migration(file_path, record_type, dry_run, verbose))
+    asyncio.run(_run_migration(file_path, record_type, layout_file, dry_run, verbose))
 
 
 @app.command()
@@ -276,6 +277,7 @@ def logs(
 async def _run_migration(
     file_path: str,
     record_type: str,
+    layout_file: Optional[str],
     dry_run: bool,
     verbose: bool
 ):
@@ -318,7 +320,8 @@ async def _run_migration(
             result = await workflow.run(
                 file_path=file_path,
                 record_type=record_type,
-                target_system=target_system
+                target_system=target_system,
+                layout_file=layout_file
             )
             
             progress.update(task, completed=100, description="Migration completed")

@@ -1,0 +1,57 @@
+MAINFRAME MEMBER FILE LAYOUT
+============================
+
+Record Length: 120 characters
+Record Format: Fixed Width
+
+Field Positions:
+================
+
+Position  Length  Field Name           Description
+--------  ------  -----------------    -----------
+1-4       4       MEMBER_ID            Member identification number (0001-9999)
+5-13      9       LAST_NAME            Member last name (left justified, space padded)
+14-22     9       FIRST_NAME           Member first name (left justified, space padded)
+23-30     8       BIRTH_DATE           Date of birth (YYYYMMDD)
+31        1       GENDER               Gender (M/F)
+32-54     23      ADDRESS              Street address (left justified, space padded)
+55-69     15      CITY                 City name (left justified, space padded)
+70-71     2       STATE                State abbreviation
+72-76     5       ZIP_CODE             ZIP code (5 digits)
+77        1       COUNTRY              Country code (1=USA, 2=Canada, etc.)
+78-87     10      PHONE                Phone number (digits only)
+88-95     8       JOIN_DATE            Membership join date (YYYYMMDD)
+96-103    8       LAST_UPDATE          Last record update date (YYYYMMDD)
+104-111   8       MEMBERSHIP_TYPE      Membership type (PREMIUM, STANDARD, BASIC)
+112       1       STATUS               Status code (A=Active, S=Suspended, I=Inactive)
+113-120   8       RESERVED             Reserved for future use (spaces)
+
+Sample Record Breakdown:
+=======================
+0001SMITH    JOHN     19850315M123 MAIN STREET        SPRINGFIELD IL626014155512345672020011520231201PREMIUM A
+
+Position 1-4:    0001              (Member ID)
+Position 5-13:   SMITH             (Last Name)
+Position 14-22:  JOHN              (First Name)
+Position 23-30:  19850315          (Birth Date: March 15, 1985)
+Position 31:     M                 (Gender: Male)
+Position 32-54:  123 MAIN STREET   (Address)
+Position 55-69:  SPRINGFIELD       (City)
+Position 70-71:  IL                (State)
+Position 72-76:  62601             (ZIP Code)
+Position 77:     1                 (Country: USA)
+Position 78-87:  5551234567        (Phone Number)
+Position 88-95:  20200115          (Join Date: January 15, 2020)
+Position 96-103: 20231201          (Last Update: December 1, 2023)
+Position 104-111: PREMIUM          (Membership Type)
+Position 112:    A                 (Status: Active)
+Position 113-120: (spaces)         (Reserved)
+
+Notes:
+======
+- All text fields are left-justified and space-padded to fill the field width
+- Dates are in YYYYMMDD format
+- Phone numbers contain digits only (no formatting)
+- Status codes: A=Active, S=Suspended, I=Inactive
+- Names may be truncated if longer than field width
+- This format is typical for legacy mainframe systems

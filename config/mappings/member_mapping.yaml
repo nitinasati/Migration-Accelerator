@@ -1,0 +1,278 @@
+# Member Data Mapping Configuration
+# This file defines how source member data fields map to target system fields
+
+# Mapping metadata
+name: "member_mapping"
+version: "1.0"
+description: "Mapping configuration for member enrollment and demographic data"
+record_type: "member"
+source_system: "HR_System"
+target_system: "Benefits_Platform"
+created_date: "2025-09-07"
+last_updated: "2025-09-07"
+
+# Source to target field mappings
+field_mappings:
+  # Primary identifiers
+  member_id:
+    target: "memberId"
+    type: "string"
+    required: true
+    description: "Unique member identifier"
+    validation:
+      pattern: "^MEM\\d{3}$"
+      max_length: 10
+
+  # Personal information
+  first_name:
+    target: "firstName"
+    type: "string" 
+    required: true
+    description: "Member's first name"
+    transformation: "title_case"
+    validation:
+      min_length: 1
+      max_length: 50
+
+  last_name:
+    target: "lastName"
+    type: "string"
+    required: true
+    description: "Member's last name"
+    transformation: "title_case"
+    validation:
+      min_length: 1
+      max_length: 50
+
+  date_of_birth:
+    target: "dateOfBirth"
+    type: "date"
+    required: true
+    description: "Member's date of birth"
+    format: "YYYY-MM-DD"
+    validation:
+      min_date: "1900-01-01"
+      max_date: "2010-12-31"
+
+  gender:
+    target: "gender"
+    type: "string"
+    required: false
+    description: "Member's gender"
+    value_mapping:
+      "M": "Male"
+      "F": "Female"
+      "O": "Other"
+      "": "Not Specified"
+
+  ssn:
+    target: "socialSecurityNumber"
+    type: "string"
+    required: true
+    description: "Social Security Number"
+    transformation: "encrypt"
+    validation:
+      pattern: "^\\d{3}-\\d{2}-\\d{4}$"
+
+  # Contact information
+  email:
+    target: "emailAddress"
+    type: "email"
+    required: true
+    description: "Primary email address"
+    transformation: "lowercase"
+    validation:
+      format: "email"
+      max_length: 100
+
+  phone:
+    target: "phoneNumber"
+    type: "string"
+    required: false
+    description: "Primary phone number"
+    transformation: "format_phone"
+    validation:
+      pattern: "^\\d{3}-\\d{4}$|^\\d{10}$"
+
+  # Address information
+  address_line1:
+    target: "addressLine1"
+    type: "string"
+    required: true
+    description: "Primary address line"
+    validation:
+      max_length: 100
+
+  address_line2:
+    target: "addressLine2"
+    type: "string"
+    required: false
+    description: "Secondary address line"
+    validation:
+      max_length: 50
+
+  city:
+    target: "city"
+    type: "string"
+    required: true
+    description: "City name"
+    transformation: "title_case"
+    validation:
+      max_length: 50
+
+  state:
+    target: "stateCode"
+    type: "string"
+    required: true
+    description: "State abbreviation"
+    transformation: "uppercase"
+    validation:
+      pattern: "^[A-Z]{2}$"
+
+  zip_code:
+    target: "postalCode"
+    type: "string"
+    required: true
+    description: "ZIP or postal code"
+    validation:
+      pattern: "^\\d{5}(-\\d{4})?$"
+
+  # Employment information
+  department:
+    target: "departmentName"
+    type: "string"
+    required: false
+    description: "Employee department"
+    transformation: "title_case"
+    validation:
+      max_length: 50
+
+  job_title:
+    target: "jobTitle"
+    type: "string"
+    required: false
+    description: "Employee job title"
+    transformation: "title_case"
+    validation:
+      max_length: 75
+
+  # Plan information
+  plan_type:
+    target: "planType"
+    type: "string"
+    required: true
+    description: "Insurance plan type"
+    value_mapping:
+      "Basic": "BASIC_PLAN"
+      "Standard": "STANDARD_PLAN"
+      "Premium": "PREMIUM_PLAN"
+    validation:
+      allowed_values: ["BASIC_PLAN", "STANDARD_PLAN", "PREMIUM_PLAN"]
+
+  enrollment_date:
+    target: "enrollmentDate"
+    type: "date"
+    required: true
+    description: "Plan enrollment date"
+    format: "YYYY-MM-DD"
+    validation:
+      min_date: "2020-01-01"
+
+  status:
+    target: "memberStatus"
+    type: "string"
+    required: true
+    description: "Current member status"
+    value_mapping:
+      "Active": "ACTIVE"
+      "Inactive": "INACTIVE"
+      "Pending": "PENDING"
+      "Suspended": "SUSPENDED"
+    validation:
+      allowed_values: ["ACTIVE", "INACTIVE", "PENDING", "SUSPENDED"]
+
+  # Emergency contact
+  emergency_contact_name:
+    target: "emergencyContactName"
+    type: "string"
+    required: false
+    description: "Emergency contact full name"
+    transformation: "title_case"
+    validation:
+      max_length: 100
+
+  emergency_contact_phone:
+    target: "emergencyContactPhone"
+    type: "string"
+    required: false
+    description: "Emergency contact phone number"
+    transformation: "format_phone"
+    validation:
+      pattern: "^\\d{3}-\\d{4}$|^\\d{10}$"
+
+# Data quality rules
+data_quality_rules:
+  - rule: "age_validation"
+    description: "Member must be at least 18 years old"
+    condition: "date_of_birth <= today() - 18 years"
+    
+  - rule: "enrollment_date_validation"
+    description: "Enrollment date cannot be in the future"
+    condition: "enrollment_date <= today()"
+    
+  - rule: "email_uniqueness"
+    description: "Email addresses must be unique across all members"
+    condition: "unique(email)"
+
+# Transformation rules
+transformation_rules:
+  - name: "title_case"
+    description: "Convert to title case (first letter of each word capitalized)"
+    
+  - name: "uppercase"
+    description: "Convert to uppercase"
+    
+  - name: "lowercase"
+    description: "Convert to lowercase"
+    
+  - name: "format_phone"
+    description: "Format phone number as XXX-XXXX"
+    
+  - name: "encrypt"
+    description: "Encrypt sensitive data using AES-256"
+
+# Business rules
+business_rules:
+  - rule: "premium_plan_age_restriction"
+    description: "Premium plans are only available for members 21 and older"
+    condition: "if plan_type == 'Premium' then age >= 21"
+    
+  - rule: "emergency_contact_required_for_minors"
+    description: "Emergency contact is required for members under 26"
+    condition: "if age < 26 then emergency_contact_name is not null"
+
+# Target schema validation
+target_schema:
+  required_fields: 
+    - "memberId"
+    - "firstName" 
+    - "lastName"
+    - "dateOfBirth"
+    - "emailAddress"
+    - "addressLine1"
+    - "city"
+    - "stateCode"
+    - "postalCode"
+    - "planType"
+    - "enrollmentDate"
+    - "memberStatus"
+  
+  optional_fields:
+    - "gender"
+    - "socialSecurityNumber"
+    - "phoneNumber"
+    - "addressLine2"
+    - "departmentName"
+    - "jobTitle"
+    - "emergencyContactName"
+    - "emergencyContactPhone"

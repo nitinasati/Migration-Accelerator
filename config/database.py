@@ -92,3 +92,15 @@ class WorkflowCheckpoint(BaseModel):
     state_data: dict = Field(description="Complete workflow state at checkpoint")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="Checkpoint creation timestamp")
     metadata: Optional[dict] = Field(default=None, description="Additional checkpoint metadata")
+
+
+class SearchFilters(BaseModel):
+    """Model for search filters."""
+    
+    status: Optional[str] = Field(default=None, description="Filter by status")
+    record_type: Optional[str] = Field(default=None, description="Filter by record type")
+    file_path: Optional[str] = Field(default=None, description="Filter by file path")
+    start_date: Optional[datetime] = Field(default=None, description="Filter by start date")
+    end_date: Optional[datetime] = Field(default=None, description="Filter by end date")
+    limit: int = Field(default=100, description="Maximum number of results")
+    offset: int = Field(default=0, description="Number of results to skip")
